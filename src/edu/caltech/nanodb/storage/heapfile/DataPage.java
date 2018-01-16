@@ -597,7 +597,26 @@ public class DataPage {
                 " slots, but slot " + slot + " was requested for deletion.");
         }
 
-        // TODO:  Complete this implementation.
-        throw new UnsupportedOperationException("TODO:  Implement!");
+        // New code completed below for tuple deletion
+        int slotVal = getSlotValue(dbPage, slot);
+        int len = getTupleLength(dbPage, slot);
+        deleteTupleDataRange(dbPage, slotVal, len);
+        setSlotValue(dbPage, slot, EMPTY_SLOT);
+
+        // We will only remove slots if the slot we are on is the last slot in
+        // the header. If it is, we definitely delete that one, and there may
+        // be empty slots that we can remove at the new front of the head
+        if (slot == numSlots - 1) {
+            int slotI = slot - 1;
+            int numSlotsRemove = 1; // Number of slots we should remove
+            while (slotI >= 0) {
+                if (slotI == EMPTY_SLOT)
+                    numSlotsRemove += 1;
+                else
+                    break;
+                slotI -= 1;
+            }
+            setNumSlots(dbPage, numSlots - numSlotsRemove);
+        }
     }
 }
