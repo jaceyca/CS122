@@ -500,7 +500,20 @@ public abstract class PageTuple implements Tuple {
          * properly as well.  (Note that columns whose value is NULL will have
          * the special NULL_OFFSET constant as their offset in the tuple.)
          */
-        throw new UnsupportedOperationException("TODO:  Implement!");
+        if (isNullValue(iCol))
+            return; //if it's already Null, nothing to do
+
+        setNullFlag(iCol, true); //flagging as null
+        ColumnType datatype = schema.getColumnInfo(iCol).getType();
+
+        int datalength = getColumnValueSize(datatype, valueOffsets[iCol]);
+        //getting the number of bytes the column takes up
+
+        deleteTupleDataRange(valueOffsets[iCol], datalength);
+        // /deleting the tuple range
+
+        pageOffset += datalength; //updating our offsets
+        computeValueOffsets();
     }
 
 
