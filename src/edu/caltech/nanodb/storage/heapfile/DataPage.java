@@ -1,9 +1,13 @@
 package edu.caltech.nanodb.storage.heapfile;
 
 
+import edu.caltech.nanodb.storage.PageTuple;
 import org.apache.log4j.Logger;
 
 import edu.caltech.nanodb.storage.DBPage;
+
+import static com.sun.org.apache.xalan.internal.xsltc.compiler.util.Type.Int;
+import static edu.caltech.nanodb.relations.SQLDataType.SMALLINT;
 
 
 /**
@@ -212,15 +216,19 @@ public class DataPage {
     /**
      * This static helper function returns the index of where tuple data
      * currently ends in the specified data page.  This value depends more on
-     * the overall structure of the data page, and at present is simply the
-     * page-size.
+     * the overall structure of the data page. Instead of just being equal to
+     * the page size, which was the default structure, we will now subtract
+     * some space for bookkeeping to tell us where the next free block is.
      *
      * @param dbPage the data page to examine
      *
      * @return the index where the tuple data ends in this data page
      */
     public static int getTupleDataEnd(DBPage dbPage) {
-        return dbPage.getPageSize();
+        // We will store a SMALLINT at the end. As in PageTuple.getStorageSize(),
+        // SMALLINT has a size of 2. For reference, INTEGER has a size of 4. Maybe
+        // we can use TINYINT (size of 1) to save more space.
+        return dbPage.getPageSize() - 2;
     }
 
 

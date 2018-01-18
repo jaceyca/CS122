@@ -362,6 +362,50 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
             DataPage.initNewPage(dbPage);
         }
 
+        // New code below. Here is the approach: First we check the the value
+        // of the variable nextFreeBlock stored at the end of Block 0, the
+        // header page. If nextFreeBlock == 0, then all of the blocks are full.
+        // In this case, we must create a new page at the end of the file.
+        // If nextFreeBlock != 0, we check if the specified block actually exists.
+        // If it does, then we access that block and check if the tuple can fit
+        // in there. If not, then we check that block's nextFreeBlock value,
+        // and so on.
+
+        pageNo = 0; // Start at the header page
+        dbPage = storageManager.loadDBPage(dbFile, pageNo);
+        int nextFreeBlock = getValueAtOffeset(DataPage.getTupleDataEnd(dbPage));
+        if (nextFreeBlock == 0) {
+            // Try to create a new page at the end of the file.  In this
+            // circumstance, pageNo is *just past* the last page in the data
+            // file.
+            logger.debug("Creating new page " + pageNo + " to store new tuple.");
+            dbPage = storageManager.loadDBPage(dbFile, pageNo, true);
+            DataPage.initNewPage(dbPage);
+        }
+        else {
+            while (true) {
+                dbPage = storageManager.loadDBPage(dbFile, nextFreeBlock);
+                int freeSpace = DataPage.getFreeSpaceInPage(dbPage);
+
+                logger.trace(String.format("Page %d has %d bytes of free space.",
+                        pageNo, freeSpace));
+
+                // If this page has enough free space to add a new tuple, break
+                // out of the loop.  (The "+ 2" is for the new slot entry we will
+                // also need.)
+                if (freeSpace >= tupSize + 2) {
+                    logger.debug("Found space for new tuple in page " + pageNo + ".");
+                    break;
+                }
+
+                // If we reached this point then the page doesn't have enough
+                // space, so go on to the next data page.
+                nextFreeBlock = getValueAtOffset(DataPage.getTupleDataEnd(dbPage))
+            }
+        }
+
+        // New code above
+
         int slot = DataPage.allocNewTuple(dbPage, tupSize);
         int tupOffset = DataPage.getSlotValue(dbPage, slot);
 
