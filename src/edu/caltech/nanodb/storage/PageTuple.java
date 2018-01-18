@@ -2,6 +2,7 @@ package edu.caltech.nanodb.storage;
 
 
 import edu.caltech.nanodb.expressions.TypeConverter;
+import java.util.Arrays;
 
 import edu.caltech.nanodb.relations.ColumnInfo;
 import edu.caltech.nanodb.relations.ColumnType;
@@ -126,6 +127,7 @@ public abstract class PageTuple implements Tuple {
      *
      * @return {@code true} since page tuples are backed by disk pages.
      */
+    // um is this supposed to return true or false lmao
     public boolean isDiskBacked() {
         return false;
     }
@@ -500,7 +502,20 @@ public abstract class PageTuple implements Tuple {
          * properly as well.  (Note that columns whose value is NULL will have
          * the special NULL_OFFSET constant as their offset in the tuple.)
          */
-        throw new UnsupportedOperationException("TODO:  Implement!");
+        if (isNullValue(iCol))
+            return; //if it's already Null, nothing to do
+
+        setNullFlag(iCol, true); //flagging as null
+        ColumnType datatype = schema.getColumnInfo(iCol).getType();
+
+        int datalength = getColumnValueSize(datatype, valueOffsets[iCol]);
+        //getting the number of bytes the column takes up
+
+        deleteTupleDataRange(valueOffsets[iCol], datalength);
+        // /deleting the tuple range
+
+        pageOffset += datalength; //updating our offsets
+        computeValueOffsets();
     }
 
 
@@ -545,7 +560,62 @@ public abstract class PageTuple implements Tuple {
          * Finally, once you have made space for the new column value, you can
          * write the value itself using the writeNonNullValue() method.
          */
-        throw new UnsupportedOperationException("TODO:  Implement!");
+
+        // info about the old value
+        int offset = valueOffsets[iCol];
+        ColumnInfo info = schema.getColumnInfo(iCol);
+        ColumnType type = info.getType();
+
+        // check if offset == NULL_OFFSET
+        boolean isNullVal = isNullValue(iCol);
+
+        if (isNullVal) {
+            int p = iCol - 1;
+            // while the value before iCol is null, decrement
+            while (valueOffsets[p] == NULL_OFFSET && p >= 0) {
+                p--;
+            }
+            // if the while loop ended before p = -1
+            if (p >= 0) {
+                // get the ColumnType of p
+                ColumnType prev = schema.getColumnInfo(p).getType();
+                // calculate the offset for the column following p
+                offset = valueOffsets[p] + getColumnValueSize(prev, valueOffsets[p]);
+            }
+        }
+        setNullFlag(iCol, false);
+
+        // the size of the current column's value (0 if null)
+        int size = isNullVal ? 0 : getColumnValueSize(type, offset);
+
+        // length of the new object value as a string
+        int dataLength = 0;
+        // the storage size of the new object value
+        int new_size = 0;
+
+        // if the column has type VARCHAR, then we need to find the difference
+        // between the sizes of the old and new values
+        if (type.getBaseType().getTypeID() == (byte) 22) {
+            // get the length of the object value as a string
+            dataLength = TypeConverter.getStringValue(value).length();
+            // get the actual size of the object value when in the database
+            new_size = getStorageSize(type, dataLength);
+        }
+        // difference between the new VARCHAR and old VARCHAR sizes
+        int diff = new_size - size;
+
+        // either insert or delete space depending on whether the
+        // new or old VARCHAR size was larger
+        if (diff > 0) {
+            insertTupleDataRange(offset, diff);
+        } else if (diff < 0) {
+            deleteTupleDataRange(offset, -diff);
+        }
+
+        // update the page offset and valueOffsets
+        pageOffset -= diff;
+        computeValueOffsets();
+        writeNonNullValue(dbPage, offset-diff, type, value);
     }
 
 
