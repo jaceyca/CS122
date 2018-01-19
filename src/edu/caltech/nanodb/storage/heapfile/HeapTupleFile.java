@@ -445,7 +445,7 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         // for simplicity. Also, we probably shouldn't wait until the page is completely
         // full because that may be hard to achieve.
         int freeSpace = DataPage.getFreeSpaceInPage(dbPage);
-        if (freeSpace < tupSize + 200) {
+        if (freeSpace < dbFile.getPageSize()/100) { // We need to create new page
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
             prevPage.writeInt(getTupleDataEnd(prevPage), nextFreeBlockNo+1);
             dbPage = storageManager.loadDBPage(dbFile, nextFreeBlockNo+1, true);
@@ -505,9 +505,20 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         DBPage dbPage = ptup.getDBPage();
         DataPage.deleteTuple(dbPage, ptup.getSlot());
         DataPage.sanityCheck(dbPage);
+        int pageNo = dbPage.getPageNo();
 
         // Note that we don't invalidate the page-tuple when it is deleted,
         // so that the tuple can still be unpinned, etc.
+
+        int freeSpace = DataPage.getFreeSpaceInPage(dbPage);
+        DBFile dbFile = dbPage.getDBFile();
+        if (freeSpace < dbFile.getPageSize()/100) {
+            // First we want to access the header page
+            DBPage header = storageManager.loadDBPage(dbFile, 0);
+            int prevFirst = dbPage.readInt(getTupleDataEnd(header));
+            dbPage.writeInt(getTupleDataEnd(dbPage), prevFirst);
+            header.writeInt(getTupleDataEnd(header), pageNo);
+        }
     }
 
 

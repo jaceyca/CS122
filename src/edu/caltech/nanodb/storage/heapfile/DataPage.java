@@ -1,6 +1,7 @@
 package edu.caltech.nanodb.storage.heapfile;
 
 
+import edu.caltech.nanodb.storage.DBFile;
 import edu.caltech.nanodb.storage.PageTuple;
 import org.apache.log4j.Logger;
 
@@ -29,7 +30,6 @@ import edu.caltech.nanodb.storage.DBPage;
 public class DataPage {
     /** A logging object for reporting anything interesting that happens. */
     private static Logger logger = Logger.getLogger(DataPage.class);
-
 
     /**
      * The offset in the data page where the number of slots in the slot table
