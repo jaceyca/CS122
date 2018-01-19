@@ -396,15 +396,23 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         // we update the previous block's nextFreeBlock value to point to the
         // nextFreeBlock value that was stored by the block that is now full.
         if (DataPage.pageIsFull(dbPage)) {
+            int numPages = dbFile.getNumPages();
+//            DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
+//            prevPage.writeInt(getTupleDataEnd(prevPage), numPages);
+//            dbPage = storageManager.loadDBPage(dbFile, numPages, true);
+//            DataPage.initNewPage(dbPage); // Create the new page
+//            dbPage.writeInt(getTupleDataEnd(dbPage), 0);
+
+
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
+            prevPage.writeInt(getTupleDataEnd(prevPage), numPages);
             int nextPageNo = dbPage.readInt(getTupleDataEnd(dbPage));
             dbPage.writeInt(getTupleDataEnd(dbPage), 0);
-            int numPages = dbFile.getNumPages();
+//            int numPages = dbFile.getNumPages();
 //            if (nextPageNo == 0) {
-            DBPage newDbPage = storageManager.loadDBPage(dbFile, numPages);
+            DBPage newDbPage = storageManager.loadDBPage(dbFile, numPages, true);
             DataPage.initNewPage(newDbPage);
             newDbPage.writeInt(getTupleDataEnd(newDbPage), 0);
-            prevPage.writeInt(getTupleDataEnd(prevPage), numPages);
 //            }
 //            else {
 //                prevPage.writeInt(getTupleDataEnd(prevPage), nextPageNo);
