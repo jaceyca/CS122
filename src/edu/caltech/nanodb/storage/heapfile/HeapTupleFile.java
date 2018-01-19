@@ -25,6 +25,8 @@ import edu.caltech.nanodb.storage.PageTuple;
 import edu.caltech.nanodb.storage.StorageManager;
 import edu.caltech.nanodb.storage.TupleFileManager;
 
+import static edu.caltech.nanodb.storage.heapfile.DataPage.getTupleDataEnd;
+
 
 /**
  * This class implements the TupleFile interface for heap files.
@@ -319,48 +321,48 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
 
         // Search for a page to put the tuple in.  If we hit the end of the
         // data file, create a new page.
-        int pageNo = 1;
-        DBPage dbPage = null;
-        while (true) {
-            // Try to load the page without creating a new one.
-            try {
-                dbPage = storageManager.loadDBPage(dbFile, pageNo);
-            }
-            catch (EOFException eofe) {
-                // Couldn't load the current page, because it doesn't exist.
-                // Break out of the loop.
-                logger.debug("Reached end of data file without finding " +
-                             "space for new tuple.");
-                break;
-            }
-
-            int freeSpace = DataPage.getFreeSpaceInPage(dbPage);
-
-            logger.trace(String.format("Page %d has %d bytes of free space.",
-                         pageNo, freeSpace));
-
-            // If this page has enough free space to add a new tuple, break
-            // out of the loop.  (The "+ 2" is for the new slot entry we will
-            // also need.)
-            if (freeSpace >= tupSize + 2) {
-                logger.debug("Found space for new tuple in page " + pageNo + ".");
-                break;
-            }
-
-            // If we reached this point then the page doesn't have enough
-            // space, so go on to the next data page.
-            dbPage = null;  // So the next section will work properly.
-            pageNo++;
-        }
-
-        if (dbPage == null) {
-            // Try to create a new page at the end of the file.  In this
-            // circumstance, pageNo is *just past* the last page in the data
-            // file.
-            logger.debug("Creating new page " + pageNo + " to store new tuple.");
-            dbPage = storageManager.loadDBPage(dbFile, pageNo, true);
-            DataPage.initNewPage(dbPage);
-        }
+//        int pageNo = 1;
+//        DBPage dbPage = null;
+//        while (true) {
+//            // Try to load the page without creating a new one.
+//            try {
+//                dbPage = storageManager.loadDBPage(dbFile, pageNo);
+//            }
+//            catch (EOFException eofe) {
+//                // Couldn't load the current page, because it doesn't exist.
+//                // Break out of the loop.
+//                logger.debug("Reached end of data file without finding " +
+//                             "space for new tuple.");
+//                break;
+//            }
+//
+//            int freeSpace = DataPage.getFreeSpaceInPage(dbPage);
+//
+//            logger.trace(String.format("Page %d has %d bytes of free space.",
+//                         pageNo, freeSpace));
+//
+//            // If this page has enough free space to add a new tuple, break
+//            // out of the loop.  (The "+ 2" is for the new slot entry we will
+//            // also need.)
+//            if (freeSpace >= tupSize + 2) {
+//                logger.debug("Found space for new tuple in page " + pageNo + ".");
+//                break;
+//            }
+//
+//            // If we reached this point then the page doesn't have enough
+//            // space, so go on to the next data page.
+//            dbPage = null;  // So the next section will work properly.
+//            pageNo++;
+//        }
+//
+//        if (dbPage == null) {
+//            // Try to create a new page at the end of the file.  In this
+//            // circumstance, pageNo is *just past* the last page in the data
+//            // file.
+//            logger.debug("Creating new page " + pageNo + " to store new tuple.");
+//            dbPage = storageManager.loadDBPage(dbFile, pageNo, true);
+//            DataPage.initNewPage(dbPage);
+//        }
 
         // New code below. Here is the approach: First we check the the value
         // of the variable nextFreeBlock stored at the end of Block 0, the
@@ -371,24 +373,25 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         // in there. If not, then we check that block's nextFreeBlock value,
         // and so on.
 
-        pageNo = 0; // Start at the header page
-        int prevPageNo = 0; // Store the previous page number
-        dbPage = storageManager.loadDBPage(dbFile, pageNo);
+        Integer pageNo = 0; // Start at the header page
+        Integer prevPageNo = 0; // Store the previous page number
+        DBPage dbPage = storageManager.loadDBPage(dbFile, pageNo);
         // We need to write a function getValueAtOffset(dbPage, offset) where we need
         // to get the value from dbPage stored at offset "offset". In the line below,
         // we want to get the pointer to the next free block as defined by out
         // great strategy.
-        int nextFreeBlockNo = getValueAtOffset(dbPage, DataPage.getTupleDataEnd(dbPage));
+
+        Integer nextFreeBlockNo = dbPage.readInt(getTupleDataEnd(dbPage));
         if (nextFreeBlockNo == 0) {
             // Try to create a new page at the end of the file.  In this
             // circumstance, pageNo is *just past* the last page in the data
             // file.
-            pageNo = DBFile.getNumPagesE(dbFile);
+            pageNo = dbFile.getNumPages();
             logger.debug("Creating new page " + pageNo + " to store new tuple.");
             dbPage = storageManager.loadDBPage(dbFile, pageNo, true);
             DataPage.initNewPage(dbPage);
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
-            setValueAtOffset(prevPage, DataPage.getTupleDataEnd(prevPage), pageNo);
+            prevPage.writeInt(getTupleDataEnd(prevPage), pageNo);
         }
         else { // There is a block with free space and we will find it
             while (true) {
@@ -409,7 +412,7 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
                 // If we reached this point then the page doesn't have enough
                 // space, so go on to the next data page.
                 prevPageNo = nextFreeBlockNo;
-                nextFreeBlockNo = getValueAtOffset(dbPage, DataPage.getTupleDataEnd(dbPage));
+                nextFreeBlockNo = dbPage.readInt(getTupleDataEnd(dbPage));
             }
         }
 
@@ -433,19 +436,19 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
             // We need to make (or find) a function to set a pointer to a new block given
             // the block (page) and the offset.
-            setValueAtOffset(prevPage, DataPage.getTupleDataEnd(prevPage), nextFreeBlockNo);
+            prevPage.writeInt(getTupleDataEnd(prevPage), nextFreeBlockNo);
         }
 
         // New code above
 
-        int slot = DataPage.allocNewTuple(dbPage, tupSize);
-        int tupOffset = DataPage.getSlotValue(dbPage, slot);
-
-        logger.debug(String.format(
-            "New tuple will reside on page %d, slot %d.", pageNo, slot));
-
-        HeapFilePageTuple pageTup =
-            HeapFilePageTuple.storeNewTuple(schema, dbPage, slot, tupOffset, tup);
+//        int slot = DataPage.allocNewTuple(dbPage, tupSize);
+//        int tupOffset = DataPage.getSlotValue(dbPage, slot);
+//
+//        logger.debug(String.format(
+//            "New tuple will reside on page %d, slot %d.", pageNo, slot));
+//
+//        HeapFilePageTuple pageTup =
+//            HeapFilePageTuple.storeNewTuple(schema, dbPage, slot, tupOffset, tup);
 
         DataPage.sanityCheck(dbPage);
 

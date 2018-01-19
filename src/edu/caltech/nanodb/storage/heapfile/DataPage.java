@@ -6,8 +6,8 @@ import org.apache.log4j.Logger;
 
 import edu.caltech.nanodb.storage.DBPage;
 
-import static com.sun.org.apache.xalan.internal.xsltc.compiler.util.Type.Int;
-import static edu.caltech.nanodb.relations.SQLDataType.SMALLINT;
+//import static com.sun.org.apache.xalan.internal.xsltc.compiler.util.Type.Int;
+//import static edu.caltech.nanodb.relations.SQLDataType.SMALLINT;
 
 
 /**
@@ -228,7 +228,7 @@ public class DataPage {
         // We will store a SMALLINT at the end. As in PageTuple.getStorageSize(),
         // SMALLINT has a size of 2. For reference, INTEGER has a size of 4. Maybe
         // we can use TINYINT (size of 1) to save more space.
-        return dbPage.getPageSize() - 2;
+        return dbPage.getPageSize() - ((byte) 4);
     }
 
 
