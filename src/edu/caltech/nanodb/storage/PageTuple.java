@@ -570,20 +570,21 @@ public abstract class PageTuple implements Tuple {
         boolean isNullVal = isNullValue(iCol);
 
         if (isNullVal) {
+            setNullFlag(iCol, false);
+
             int p = iCol - 1;
             // while the value before iCol is null, decrement
-            while (valueOffsets[p] == NULL_OFFSET && p >= 0) {
+            while (p >= 0) {
                 p--;
-            }
-            // if the while loop ended before p = -1
-            if (p >= 0) {
-                // get the ColumnType of p
-                ColumnType prev = schema.getColumnInfo(p).getType();
-                // calculate the offset for the column following p
-                offset = valueOffsets[p] + getColumnValueSize(prev, valueOffsets[p]);
+                if (valueOffsets[p] == NULL_OFFSET) {
+                    // get the ColumnType of p
+                    ColumnType prev = schema.getColumnInfo(p).getType();
+                    // calculate the offset for the column following p
+                    offset = valueOffsets[p] + getColumnValueSize(prev, valueOffsets[p]);
+                    break;
+                }
             }
         }
-        setNullFlag(iCol, false);
 
         // the size of the current column's value (0 if null)
         int size = isNullVal ? 0 : getColumnValueSize(type, offset);
@@ -595,27 +596,30 @@ public abstract class PageTuple implements Tuple {
 
         // if the column has type VARCHAR, then we need to find the difference
         // between the sizes of the old and new values
-        if (type.getBaseType().getTypeID() == (byte) 22) {
+        if (type.getBaseType() == SQLDataType.VARCHAR) {
             // get the length of the object value as a string
             dataLength = TypeConverter.getStringValue(value).length();
-            // get the actual size of the object value when in the database
-            new_size = getStorageSize(type, dataLength);
         }
+        // get the actual size of the object value when in the database
+        new_size = getStorageSize(type, dataLength);
         // difference between the new VARCHAR and old VARCHAR sizes
         int diff = new_size - size;
 
-        // either insert or delete space depending on whether the
-        // new or old VARCHAR size was larger
-        if (diff > 0) {
-            insertTupleDataRange(offset, diff);
-        } else if (diff < 0) {
-            deleteTupleDataRange(offset, -diff);
+        
+        if (!isNullVal) {
+            // either insert or delete space depending on whether the
+            // new or old VARCHAR size was larger
+            if (diff > 0) {
+                insertTupleDataRange(offset, diff);
+            } else if (diff < 0) {
+                deleteTupleDataRange(offset, -diff);
+            }
         }
 
         // update the page offset and valueOffsets
         pageOffset -= diff;
-        computeValueOffsets();
         writeNonNullValue(dbPage, offset-diff, type, value);
+        computeValueOffsets();
     }
 
 
