@@ -388,7 +388,7 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
             dbPage = storageManager.loadDBPage(dbFile, pageNo, true);
             DataPage.initNewPage(dbPage);
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
-            setValueAtOffset(prevPage, DataPage.getTupleDataEnd, pageNo);
+            setValueAtOffset(prevPage, DataPage.getTupleDataEnd(prevPage), pageNo);
         }
         else { // There is a block with free space and we will find it
             while (true) {

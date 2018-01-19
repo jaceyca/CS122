@@ -2,7 +2,6 @@ package edu.caltech.nanodb.storage;
 
 
 import edu.caltech.nanodb.expressions.TypeConverter;
-import java.util.Arrays;
 
 import edu.caltech.nanodb.relations.ColumnInfo;
 import edu.caltech.nanodb.relations.ColumnType;
