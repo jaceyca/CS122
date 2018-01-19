@@ -344,12 +344,12 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
             // file.
             pageNo = dbFile.getNumPages(); // The page number of the new page
             logger.debug("Creating new page " + pageNo + " to store new tuple.");
-            DBPage newDbPage = storageManager.loadDBPage(dbFile, pageNo, true);
-            DataPage.initNewPage(newDbPage); // Create the new page
-            dbPage.writeInt(getTupleDataEnd(newDbPage), 0);
+            dbPage = storageManager.loadDBPage(dbFile, pageNo, true);
+            DataPage.initNewPage(dbPage); // Create the new page
+            dbPage.writeInt(getTupleDataEnd(dbPage), 0);
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
             prevPage.writeInt(getTupleDataEnd(prevPage), pageNo);
-//            System.out.println("Wrote to header number "+pageNo);
+            System.out.println("Wrote to header number "+pageNo);
         }
         else { // There is a block with free space and we will find it
             while (true) {
@@ -399,15 +399,16 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
             int nextPageNo = dbPage.readInt(getTupleDataEnd(dbPage));
             dbPage.writeInt(getTupleDataEnd(dbPage), 0);
-            if (nextPageNo == 0) {
-                DBPage newDbPage = storageManager.loadDBPage(dbFile, dbFile.getNumPages());
-                DataPage.initNewPage(newDbPage);
-                newDbPage.writeInt(getTupleDataEnd(newDbPage), 0);
-                prevPage.writeInt(getTupleDataEnd(prevPage), dbFile.getNumPages());
-            }
-            else {
-                prevPage.writeInt(getTupleDataEnd(prevPage), nextPageNo);
-            }
+            int numPages = dbFile.getNumPages();
+//            if (nextPageNo == 0) {
+            DBPage newDbPage = storageManager.loadDBPage(dbFile, numPages);
+            DataPage.initNewPage(newDbPage);
+            newDbPage.writeInt(getTupleDataEnd(newDbPage), 0);
+            prevPage.writeInt(getTupleDataEnd(prevPage), numPages);
+//            }
+//            else {
+//                prevPage.writeInt(getTupleDataEnd(prevPage), nextPageNo);
+//            }
         }
 
         DataPage.sanityCheck(dbPage);
