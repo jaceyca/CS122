@@ -225,7 +225,7 @@ public class DataPage {
      * @return the index where the tuple data ends in this data page
      */
     public static int getTupleDataEnd(DBPage dbPage) {
-        // We will store a SMALLINT at the end. As in PageTuple.getStorageSize(),
+        // We will store a INTEGER at the end. As in PageTuple.getStorageSize(),
         // SMALLINT has a size of 2. For reference, INTEGER has a size of 4. Maybe
         // we can use TINYINT (size of 1) to save more space.
         return dbPage.getPageSize() -  4;
@@ -293,6 +293,13 @@ public class DataPage {
         return getTupleDataStart(dbPage) - getSlotsEndIndex(dbPage);
     }
 
+    /**
+     * This static helper function returns true if there is not enough free space
+     * in a tuple data page for another tuple. The way we determine if a
+     * page is "full" is if the maximum size tuple possible for the page's
+     * schema can fit inside the page.
+     */
+    public static boolean pageIsFull(DBPage dbPage) { return getFreeSpaceInPage(dbPage) < 500 ?  true : false; }
 
     /**
      * This static helper method verifies that the specified data page has

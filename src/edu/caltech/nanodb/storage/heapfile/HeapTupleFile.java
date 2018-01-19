@@ -63,7 +63,6 @@ public class HeapTupleFile implements TupleFile {
     /** The file that stores the tuples. */
     private DBFile dbFile;
 
-
     public HeapTupleFile(StorageManager storageManager,
                          HeapTupleFileManager heapFileManager, DBFile dbFile,
                          TableSchema schema, TableStats stats) {
@@ -319,50 +318,6 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
                 " is larger than page size " + dbFile.getPageSize() + ".");
         }
 
-        // Search for a page to put the tuple in.  If we hit the end of the
-        // data file, create a new page.
-//        int pageNo = 1;
-//        DBPage dbPage = null;
-//        while (true) {
-//            // Try to load the page without creating a new one.
-//            try {
-//                dbPage = storageManager.loadDBPage(dbFile, pageNo);
-//            }
-//            catch (EOFException eofe) {
-//                // Couldn't load the current page, because it doesn't exist.
-//                // Break out of the loop.
-//                logger.debug("Reached end of data file without finding " +
-//                             "space for new tuple.");
-//                break;
-//            }
-//
-//            int freeSpace = DataPage.getFreeSpaceInPage(dbPage);
-//
-//            logger.trace(String.format("Page %d has %d bytes of free space.",
-//                         pageNo, freeSpace));
-//
-//            // If this page has enough free space to add a new tuple, break
-//            // out of the loop.  (The "+ 2" is for the new slot entry we will
-//            // also need.)
-//            if (freeSpace >= tupSize + 2) {
-//                logger.debug("Found space for new tuple in page " + pageNo + ".");
-//                break;
-//            }
-//
-//            // If we reached this point then the page doesn't have enough
-//            // space, so go on to the next data page.
-//            dbPage = null;  // So the next section will work properly.
-//            pageNo++;
-//        }
-//
-//        if (dbPage == null) {
-//            // Try to create a new page at the end of the file.  In this
-//            // circumstance, pageNo is *just past* the last page in the data
-//            // file.
-//            logger.debug("Creating new page " + pageNo + " to store new tuple.");
-//            dbPage = storageManager.loadDBPage(dbFile, pageNo, true);
-//            DataPage.initNewPage(dbPage);
-//        }
 
         // New code below. Here is the approach: First we check the the value
         // of the variable nextFreeBlock stored at the end of Block 0, the
@@ -380,7 +335,6 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         // we want to get the pointer to the next free block as defined by out
         // great strategy.
         if (dbFile.getNumPages() == 1) { // If this is one, then we only have the header page
-//            System.out.print("HELLLOOOOO");
             dbPage.writeInt(getTupleDataEnd(dbPage), 0); // Write 0 into header page
         }
         Integer nextFreeBlockNo = dbPage.readInt(getTupleDataEnd(dbPage));
@@ -388,14 +342,14 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
             // Try to create a new page at the end of the file.  In this
             // circumstance, pageNo is *just past* the last page in the data
             // file.
-            pageNo = dbFile.getNumPages();
+            pageNo = dbFile.getNumPages(); // The page number of the new page
             logger.debug("Creating new page " + pageNo + " to store new tuple.");
-            dbPage = storageManager.loadDBPage(dbFile, pageNo, true);
-            DataPage.initNewPage(dbPage); // Create the new page
-            dbPage.writeInt(getTupleDataEnd(dbPage), 0);
+            DBPage newDbPage = storageManager.loadDBPage(dbFile, pageNo, true);
+            DataPage.initNewPage(newDbPage); // Create the new page
+            dbPage.writeInt(getTupleDataEnd(newDbPage), 0);
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
             prevPage.writeInt(getTupleDataEnd(prevPage), pageNo);
-            System.out.println("Amount of pages" + pageNo+1);
+//            System.out.println("Wrote to header number "+pageNo);
         }
         else { // There is a block with free space and we will find it
             while (true) {
@@ -440,22 +394,25 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
 
         // If after we store this new tuple, there is not enough space for another tuple,
         // we update the previous block's nextFreeBlock value to point to the
-        // nextFreeBlock value that was stored by the block that is now full. Although some
-        // tuples are different sizes, we will just use the one we were dealing with
-        // for simplicity. Also, we probably shouldn't wait until the page is completely
-        // full because that may be hard to achieve.
-        int freeSpace = DataPage.getFreeSpaceInPage(dbPage);
-        if (freeSpace < dbFile.getPageSize()/100) { // We need to create new page
+        // nextFreeBlock value that was stored by the block that is now full.
+        if (DataPage.pageIsFull(dbPage)) {
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
-            prevPage.writeInt(getTupleDataEnd(prevPage), nextFreeBlockNo+1);
-            dbPage = storageManager.loadDBPage(dbFile, nextFreeBlockNo+1, true);
-            DataPage.initNewPage(dbPage); // Create the new page
+            int nextPageNo = dbPage.readInt(getTupleDataEnd(dbPage));
             dbPage.writeInt(getTupleDataEnd(dbPage), 0);
+            if (nextPageNo == 0) {
+                DBPage newDbPage = storageManager.loadDBPage(dbFile, dbFile.getNumPages());
+                DataPage.initNewPage(newDbPage);
+                newDbPage.writeInt(getTupleDataEnd(newDbPage), 0);
+                prevPage.writeInt(getTupleDataEnd(prevPage), dbFile.getNumPages());
+            }
+            else {
+                prevPage.writeInt(getTupleDataEnd(prevPage), nextPageNo);
+            }
         }
 
-        // New code above
-
         DataPage.sanityCheck(dbPage);
+
+//        System.out.println("Tuple size " + tupSize);
 
         return pageTup;
     }
@@ -503,22 +460,33 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         HeapFilePageTuple ptup = (HeapFilePageTuple) tup;
 
         DBPage dbPage = ptup.getDBPage();
+
+        boolean wasFull = DataPage.pageIsFull(dbPage);
+
         DataPage.deleteTuple(dbPage, ptup.getSlot());
-        DataPage.sanityCheck(dbPage);
         int pageNo = dbPage.getPageNo();
 
         // Note that we don't invalidate the page-tuple when it is deleted,
         // so that the tuple can still be unpinned, etc.
 
-        int freeSpace = DataPage.getFreeSpaceInPage(dbPage);
-        DBFile dbFile = dbPage.getDBFile();
-        if (freeSpace < dbFile.getPageSize()/100) {
-            // First we want to access the header page
+        // Now, if our page was previously full, and we now have enough space,
+        // we need to rearrange our linked list to update the block we just
+        // deleted from to consider it not full now. If the block now has
+        // enough space, it should become the new start of the list, and
+        // the header block will point to it. It will point to the block
+        // that the header was originally pointing to.
+
+//        System.out.println("Header was pointing to " + prevFirst);
+        if (wasFull && !DataPage.pageIsFull(dbPage)) {
             DBPage header = storageManager.loadDBPage(dbFile, 0);
-            int prevFirst = dbPage.readInt(getTupleDataEnd(header));
+            int prevFirst = header.readInt(getTupleDataEnd(header));
+            System.out.println("Header pointed to "+prevFirst);
+//            int prevFirst = 1;
             dbPage.writeInt(getTupleDataEnd(dbPage), prevFirst);
             header.writeInt(getTupleDataEnd(header), pageNo);
         }
+
+        DataPage.sanityCheck(dbPage);
     }
 
 
