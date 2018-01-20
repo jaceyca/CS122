@@ -466,12 +466,9 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         // the header block will point to it. It will point to the block
         // that the header was originally pointing to.
 
-//        System.out.println("Header was pointing to " + prevFirst);
         if (wasFull && !DataPage.pageIsFull(dbPage)) {
             DBPage header = storageManager.loadDBPage(dbFile, 0);
             int prevFirst = header.readInt(getTupleDataEnd(header));
-            System.out.println("Header pointed to "+prevFirst);
-//            int prevFirst = 1;
             dbPage.writeInt(getTupleDataEnd(dbPage), prevFirst);
             header.writeInt(getTupleDataEnd(header), pageNo);
         }
