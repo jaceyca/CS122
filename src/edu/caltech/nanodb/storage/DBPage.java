@@ -67,7 +67,6 @@ public class DBPage implements Pinnable, AutoCloseable {
      */
     private int pinCount;
 
-
     /** This flag is true if this page has been modified in memory. */
     private boolean dirty;
 
@@ -92,6 +91,25 @@ public class DBPage implements Pinnable, AutoCloseable {
      */
     private byte[] oldPageData;
 
+    /**
+     * We store the minimum tuple size here
+     */
+    private static int minTupSize = 0;
+
+    public static int getMinTupSize(DBPage dbPage) { return minTupSize; }
+
+
+    public static void setMinTupSize(DBPage dbPage, int len) { minTupSize = len; }
+
+    /**
+     * We store the maximum tuple size here
+     */
+    private static int maxTupSize = 0;
+
+    public static int getMaxTupSize(DBPage dbPage) { return maxTupSize; }
+
+
+    public static void setMaxTupSize(DBPage dbPage, int len) { maxTupSize = len; }
 
     /**
      * Constructs a new, empty table-page for the specified table file.

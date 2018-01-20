@@ -88,7 +88,6 @@ public class HeapTupleFile implements TupleFile {
         this.stats = stats;
     }
 
-
     @Override
     public TupleFileManager getManager() {
         return heapFileManager;
@@ -349,11 +348,9 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
             dbPage.writeInt(getTupleDataEnd(dbPage), 0);
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
             prevPage.writeInt(getTupleDataEnd(prevPage), pageNo);
-            System.out.println("Wrote to header number "+pageNo);
         }
         else { // There is a block with free space and we will find it
             while (true) {
-
                 // If we have this case then we need to create a new page
                 if (nextFreeBlockNo == 0) {
                     dbPage.writeInt(getTupleDataEnd(dbPage), dbFile.getNumPages());
@@ -397,31 +394,15 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         // nextFreeBlock value that was stored by the block that is now full.
         if (DataPage.pageIsFull(dbPage)) {
             int numPages = dbFile.getNumPages();
-//            DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
-//            prevPage.writeInt(getTupleDataEnd(prevPage), numPages);
-//            dbPage = storageManager.loadDBPage(dbFile, numPages, true);
-//            DataPage.initNewPage(dbPage); // Create the new page
-//            dbPage.writeInt(getTupleDataEnd(dbPage), 0);
-
-
             DBPage prevPage = storageManager.loadDBPage(dbFile, prevPageNo);
             prevPage.writeInt(getTupleDataEnd(prevPage), numPages);
-            int nextPageNo = dbPage.readInt(getTupleDataEnd(dbPage));
             dbPage.writeInt(getTupleDataEnd(dbPage), 0);
-//            int numPages = dbFile.getNumPages();
-//            if (nextPageNo == 0) {
             DBPage newDbPage = storageManager.loadDBPage(dbFile, numPages, true);
             DataPage.initNewPage(newDbPage);
             newDbPage.writeInt(getTupleDataEnd(newDbPage), 0);
-//            }
-//            else {
-//                prevPage.writeInt(getTupleDataEnd(prevPage), nextPageNo);
-//            }
         }
 
         DataPage.sanityCheck(dbPage);
-
-//        System.out.println("Tuple size " + tupSize);
 
         return pageTup;
     }

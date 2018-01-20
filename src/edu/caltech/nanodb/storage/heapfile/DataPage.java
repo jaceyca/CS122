@@ -105,7 +105,6 @@ public class DataPage {
         return getSlotOffset(getNumSlots(dbPage));
     }
 
-
     /**
      * This static helper function returns the value stored in the specified
      * slot.  This will either be the offset of the start of a tuple in the data
@@ -299,7 +298,10 @@ public class DataPage {
      * page is "full" is if the maximum size tuple possible for the page's
      * schema can fit inside the page.
      */
-    public static boolean pageIsFull(DBPage dbPage) { return getFreeSpaceInPage(dbPage) < 500 ?  true : false; }
+    public static boolean pageIsFull(DBPage dbPage) {
+//        System.out.printf("Free space: %d, maxTupSize: %d\n", getFreeSpaceInPage(dbPage), dbPage.getMaxTupSize(dbPage));
+        return getFreeSpaceInPage(dbPage) < dbPage.getMaxTupSize(dbPage) ?  true : false;
+    }
 
     /**
      * This static helper method verifies that the specified data page has
@@ -369,6 +371,18 @@ public class DataPage {
      * @param len The number of bytes to insert.
      */
     public static void insertTupleDataRange(DBPage dbPage, int off, int len) {
+
+        // First, we want to update our minTupSize, if possible
+        int minTupSize = dbPage.getMinTupSize(dbPage);
+        if (len < minTupSize || minTupSize == 0) {
+//            System.out.printf("minTupSize: %d, new length: %d\n", minTupSize, len);
+            dbPage.setMinTupSize(dbPage, len);
+        }
+        int maxTupSize = dbPage.getMaxTupSize(dbPage);
+        if (len > maxTupSize || maxTupSize == 0) {
+//            System.out.printf("maxTupSize: %d, new length: %d\n", maxTupSize, len);
+            dbPage.setMaxTupSize(dbPage, len);
+        }
 
         int tupDataStart = getTupleDataStart(dbPage);
 
