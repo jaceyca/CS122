@@ -44,7 +44,7 @@
     <!-- This is the temporary directory that storage-related test cases use. -->
     <property name="testTempDir" location="test_datafiles" />
 
-    <property name="jacocoHomeDir" location="jacoco-0.7.3-20141010.162345-3" />
+    <property name="jacocoHomeDir" location="jacoco-0.8.0" />
     <property name="jacocoLibDir"  location="${jacocoHomeDir}/lib" />
     <property name="jacocoResultsDir" location="${buildDir}/coverage" />
 
