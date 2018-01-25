@@ -2,8 +2,12 @@ package edu.caltech.nanodb.queryeval;
 
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import edu.caltech.nanodb.expressions.FunctionCall;
+import edu.caltech.nanodb.plannodes.*;
 import org.apache.log4j.Logger;
 
 import edu.caltech.nanodb.queryast.FromClause;
@@ -11,11 +15,6 @@ import edu.caltech.nanodb.queryast.SelectClause;
 
 import edu.caltech.nanodb.expressions.Expression;
 
-import edu.caltech.nanodb.plannodes.FileScanNode;
-import edu.caltech.nanodb.plannodes.PlanNode;
-import edu.caltech.nanodb.plannodes.SelectNode;
-
-import edu.caltech.nanodb.plannodes.SimpleFilterNode;
 import edu.caltech.nanodb.relations.TableInfo;
 
 
@@ -52,21 +51,58 @@ public class SimplePlanner extends AbstractPlannerImpl {
                     "Not implemented:  enclosing queries");
         }
 
-        if (!selClause.isTrivialProject()) {
-            throw new UnsupportedOperationException(
-                    "Not implemented:  project");
-        }
-
+        PlanNode plan;
         FromClause fromClause = selClause.getFromClause();
-        if (!fromClause.isBaseTable()) {
-            throw new UnsupportedOperationException(
-                    "Not implemented:  joins or subqueries in FROM clause");
+
+        if (!selClause.isTrivialProject()) {
+//            throw new UnsupportedOperationException(
+//                    "Not implemented:  project");
+            // Here, we support the situations where there is no child plan,
+            // and no expression references a column name
+            if (fromClause == null) {
+                plan = new ProjectNode(selClause.getSelectValues());
+                plan.prepare();
+                return plan;
+            }
         }
 
-        return makeSimpleSelect(fromClause.getTableName(),
-                selClause.getWhereExpr(), null);
+        // First, we complete the FROM clause so we have something to work with. This is the birth of a miracle
+        // This will support basic joins (not NATURAL joins or joins with USING). Left and right outer joins
+        // will be supported as well (no full-outer joins) and subqueries in the FROM clause.
+        plan = completeFromClause(fromClause, selClause);
+
+        // Now we will support grouping and aggregation. This will support multiple aggregate operations
+        // in a SELECT expression.
+        Map<String, FunctionCall> temp = new HashMap<>();
+        HashedGroupAggregateNode groupAggregateNode = new HashedGroupAggregateNode(plan, selClause.getGroupByExprs()), temp);
+
+
+        return plan;
     }
 
+    public PlanNode completeFromClause(FromClause fromClause, SelectClause selClause) throws IOException {
+        PlanNode fromPlan = null;
+        if (fromClause.isBaseTable()) {
+            // If we have this case, then our behavior is as before. Simple! Skiddle dee doo!
+            fromPlan = makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+        } // Now we need to handle subqueries
+        else if (fromClause.isDerivedTable()){
+            // If we have this case, then we have to evaluate what's inside the select query first.
+            // We can do this by simply recursively calling our makePlan function on that sub-query.
+            fromPlan = makePlan(fromClause.getSelectClause(), null);
+        }
+        else if (fromClause.isJoinExpr()) {
+            // In the joins, it is possible that the left and right clauses are derived tables or also joins.
+            // So, we recursively call completeFromClause to complete the set up of those from clauses.
+            FromClause leftFromClause = fromClause.getLeftChild();
+            FromClause rightFromClause = fromClause.getRightChild();
+            PlanNode leftChild = completeFromClause(leftFromClause, selClause);
+            PlanNode rightChild = completeFromClause(rightFromClause, selClause);
+            fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
+                    fromClause.getJoinType(), fromClause.getComputedJoinExpr());
+        }
+        return fromPlan;
+    }
 
     /**
      * Constructs a simple select plan that reads directly from a table, with

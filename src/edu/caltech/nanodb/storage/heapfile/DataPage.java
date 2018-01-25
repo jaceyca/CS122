@@ -300,7 +300,7 @@ public class DataPage {
      */
     public static boolean pageIsFull(DBPage dbPage) {
 //        System.out.printf("Free space: %d, maxTupSize: %d\n", getFreeSpaceInPage(dbPage), dbPage.getMaxTupSize(dbPage));
-        return getFreeSpaceInPage(dbPage) < dbPage.getMaxTupSize(dbPage) ?  true : false;
+        return getFreeSpaceInPage(dbPage) < dbPage.getMaxTupSize(dbPage) + 2 ?  true : false;
     }
 
     /**
