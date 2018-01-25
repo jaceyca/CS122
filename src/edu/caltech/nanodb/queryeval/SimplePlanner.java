@@ -51,7 +51,7 @@ public class SimplePlanner extends AbstractPlannerImpl {
                     "Not implemented:  enclosing queries");
         }
 
-        PlanNode plan;
+        PlanNode plan = null;
         FromClause fromClause = selClause.getFromClause();
 
         if (!selClause.isTrivialProject()) {
@@ -74,13 +74,13 @@ public class SimplePlanner extends AbstractPlannerImpl {
         // Now we will support grouping and aggregation. This will support multiple aggregate operations
         // in a SELECT expression.
         Map<String, FunctionCall> temp = new HashMap<>();
-        HashedGroupAggregateNode groupAggregateNode = new HashedGroupAggregateNode(plan, selClause.getGroupByExprs()), temp);
+        HashedGroupAggregateNode groupAggregateNode = new HashedGroupAggregateNode(plan, selClause.getGroupByExprs(), temp);
 
 
         return plan;
     }
 
-    public PlanNode completeFromClause(FromClause fromClause, SelectClause selClause) throws IOException {
+    private PlanNode completeFromClause(FromClause fromClause, SelectClause selClause) throws IOException {
         PlanNode fromPlan = null;
         if (fromClause.isBaseTable()) {
             // If we have this case, then our behavior is as before. Simple! Skiddle dee doo!
@@ -98,8 +98,13 @@ public class SimplePlanner extends AbstractPlannerImpl {
             FromClause rightFromClause = fromClause.getRightChild();
             PlanNode leftChild = completeFromClause(leftFromClause, selClause);
             PlanNode rightChild = completeFromClause(rightFromClause, selClause);
-            fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
-                    fromClause.getJoinType(), fromClause.getComputedJoinExpr());
+            if (fromClause.getConditionType() == FromClause.JoinConditionType.JOIN_ON_EXPR) {
+                fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
+                        fromClause.getJoinType(), fromClause.getOnExpression());
+            } else {
+                fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
+                        fromClause.getJoinType(), fromClause.getComputedJoinExpr());
+            }
         }
         return fromPlan;
     }
