@@ -199,28 +199,50 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
      *         {@code false} if no more pairs of tuples are available to join.
      */
     private boolean getTuplesToJoin() throws IOException {
+//        where to put cleanUp()?
         if (done)
             return false;
 
+        System.out.println("getTuplesToJoin");
+
         if (leftTuple == null) {
+            System.out.println("getTuplesToJoin.nullLeftTuple");
+            System.out.printf("LeftChild: %s \n", leftChild.toString());
+            System.out.printf("rightChild: %s \n", rightChild.toString());
+            System.out.printf("self: %s \n", toString());
             leftTuple = leftChild.getNextTuple();
+            System.out.println("getTuplesToJoin.gotNextLeft");
+
+            if (leftTuple == null) {
+                System.out.println("getTuplesToJoin.stillNull");
+                done = true;
+                return false;
+            }
         }
 
-//        if (rightTuple == null) {
-//            rightChild.initialize();
-//            rightTuple = rightChild.getNextTuple();
-//        }
-
+        rightTuple = rightChild.getNextTuple();
+        System.out.println("getTuplesToJoin.gotNextRight");
+        // iterate through the left table (outer relation)
         while (leftTuple != null) {
             if (rightTuple != null) {
+                System.out.println("getTuplesToJoin.rightTuple");
+                if (canJoinTuples()) {
+                    System.out.println("getTuplesToJoin.canJoinTuples");
+                    return true;
+                }
                 rightTuple = rightChild.getNextTuple();
-                return true;
-            } else {
+            }
+            // if we have reached the end of the inner relation, we need to reset
+            // the tuple back to the start
+            else {
+                System.out.println("getTuplesToJoin.resetRight");
                 rightChild.initialize();
                 leftTuple = leftChild.getNextTuple();
                 rightTuple = rightChild.getNextTuple();
             }
         }
+        System.out.println("getTuplesToJoin.reachedEnd");
+        done = true;
         return false;
     }
 

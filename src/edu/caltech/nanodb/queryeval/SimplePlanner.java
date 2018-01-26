@@ -55,13 +55,17 @@ public class SimplePlanner extends AbstractPlannerImpl {
 
         PlanNode plan;
         FromClause fromClause = selClause.getFromClause();
+        System.out.println("makePlan1");
 
-        if (selClause.isTrivialProject())
-            return makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+//        if (selClause.isTrivialProject()) {
+//            System.out.println("makePlan.isTrivial");
+//            return makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+//        }
 
         // Here, we support the situations where there is no child plan,
         // and no expression references a column name
         if (fromClause == null) {
+            System.out.println("makePlan.nullFromClause");
             plan = new ProjectNode(selClause.getSelectValues());
             plan.prepare();
             return plan;
@@ -70,6 +74,7 @@ public class SimplePlanner extends AbstractPlannerImpl {
         Aggregate processor = new Aggregate();
         List<SelectValue> selectValues = selClause.getSelectValues();
         List<Expression> groupByExpressions = selClause.getGroupByExprs();
+        System.out.println("makePlan2");
 
         // First, we complete the FROM clause so we have something to work with. This is the birth of a miracle
         // This will support basic joins (not NATURAL joins or joins with USING). Left and right outer joins
@@ -123,18 +128,22 @@ public class SimplePlanner extends AbstractPlannerImpl {
         PlanNode fromPlan = null;
         if (fromClause.isBaseTable()) {
             // If we have this case, then our behavior is as before. Simple! Skiddle dee doo!
-            fromPlan = makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+            System.out.println("completeFromClause.isBase");
+            fromPlan = makeSimpleSelect(fromClause.getTableName(), null, null);
         } // Now we need to handle subqueries
         else if (fromClause.isDerivedTable()){
             // If we have this case, then we have to evaluate what's inside the select query first.
             // We can do this by simply recursively calling our makePlan function on that sub-query.
+            System.out.println("completeFromClause.isDerived");
             fromPlan = makePlan(fromClause.getSelectClause(), null);
         }
         else if (fromClause.isJoinExpr()) {
             // If we have an ON clause, then we need to use our Aggregate class to check
             // if that ON clause has an aggregate. It should not have one.
+            System.out.println("completeFromClause.isJoin");
             Expression onExpression = fromClause.getOnExpression();
             if (onExpression != null) {
+                System.out.println("completeFromClause.hasOnExpression");
                 onExpression.traverse(processor);
                 if (!processor.aggregateFunctions.isEmpty())
                     throw new IllegalArgumentException("ON clauses cannot have aggregates");
@@ -146,8 +155,9 @@ public class SimplePlanner extends AbstractPlannerImpl {
             FromClause rightFromClause = fromClause.getRightChild();
             PlanNode leftChild = completeFromClause(leftFromClause, selClause, processor);
             PlanNode rightChild = completeFromClause(rightFromClause, selClause, processor);
+            System.out.println("completeFromClause.newNestedLoopJoinNode");
             fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
-                    fromClause.getJoinType(), fromClause.getComputedJoinExpr());
+                    fromClause.getJoinType(), fromClause.getOnExpression());
         }
         return fromPlan;
     }
