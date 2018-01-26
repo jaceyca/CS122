@@ -156,9 +156,21 @@ public class SimplePlanner extends AbstractPlannerImpl {
             PlanNode leftChild = completeFromClause(leftFromClause, selClause, processor);
             PlanNode rightChild = completeFromClause(rightFromClause, selClause, processor);
             System.out.println("completeFromClause.newNestedLoopJoinNode");
-            fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
-                    fromClause.getJoinType(), fromClause.getOnExpression());
+            if (onExpression == null) {
+                System.out.println("completeFromClause.nullOnExpr");
+                fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
+                        fromClause.getJoinType(), fromClause.getComputedJoinExpr());
+            }
+            else {
+                System.out.println("completeFromClause.onExpr");
+                fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
+                        fromClause.getJoinType(), fromClause.getOnExpression());
+            }
+            if (selClause.getWhereExpr() != null) {
+                fromPlan = new SimpleFilterNode(fromPlan, selClause.getWhereExpr());
+            }
         }
+        fromPlan.prepare();
         return fromPlan;
     }
 
