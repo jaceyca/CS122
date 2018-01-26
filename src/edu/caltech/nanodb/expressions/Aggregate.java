@@ -43,8 +43,6 @@ public class Aggregate implements ExpressionProcessor {
                 // Make sure this is how to use ColumnValue!!!! who dat boy?? idk
                 ColumnName colName = new ColumnName("#A" + Integer.toString(numAggregates+1));
                 node = new ColumnValue(colName);
-//                System.out.println("currPos: " + currPos);
-//                System.out.println("List size: " + aggregateFunctions.size());
                 aggregateFunctions.remove(aggregateFunctions.size()-1);
 //                System.out.println("New list size: " + aggregateFunctions.size());
 //                numAggregates -= 1; // Decrement counter as we re-visit previous nodes

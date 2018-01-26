@@ -100,6 +100,14 @@ public class SimplePlanner extends AbstractPlannerImpl {
         if (!groupByExpressions.isEmpty() || !columnReferenceMap.isEmpty())
             plan = new HashedGroupAggregateNode(plan, groupByExpressions, columnReferenceMap);
 
+        // Next, we handle HAVING expressions (if one exists) here. WHY THIS NOT WORK
+        if (selClause.getHavingExpr() != null) {
+            Expression havingExpression = selClause.getHavingExpr();
+            havingExpression.traverse(processor);
+            selClause.setHavingExpr(havingExpression);
+            plan = new SimpleFilterNode(plan, havingExpression);
+        }
+
         // Here, we support the situations where there is a child plan, and we
         // have to project the select values specified by the select clause.
         plan = new ProjectNode(plan, selectValues);
