@@ -68,6 +68,8 @@ public class SimplePlanner extends AbstractPlannerImpl {
         }
 
         Aggregate processor = new Aggregate();
+        List<SelectValue> selectValues = selClause.getSelectValues();
+        List<Expression> groupByExpressions = selClause.getGroupByExprs();
 
         // First, we complete the FROM clause so we have something to work with. This is the birth of a miracle
         // This will support basic joins (not NATURAL joins or joins with USING). Left and right outer joins
@@ -84,7 +86,7 @@ public class SimplePlanner extends AbstractPlannerImpl {
             if (!processor.aggregateFunctions.isEmpty())
                 throw new IllegalArgumentException("WHERE clauses cannot have aggregates");
         }
-        List<SelectValue> selectValues = selClause.getSelectValues();
+
         for (SelectValue sv : selectValues) {
             // Skip select-values that aren't expressions
             if (!sv.isExpression())
@@ -93,14 +95,12 @@ public class SimplePlanner extends AbstractPlannerImpl {
             sv.setExpression(e);
         }
 
-        plan = new HashedGroupAggregateNode(plan, selClause.getGroupByExprs(), processor.prepareMap());
+        if (!groupByExpressions.isEmpty())
+            plan = new HashedGroupAggregateNode(plan, groupByExpressions, processor.prepareMap());
 
-        if (!selClause.isTrivialProject()) {
-            // Here, we support the situations where there is a child plan, and we
-            // have to project the select values specified by the select clause.
-            if (fromClause == null)
-                plan = new ProjectNode(plan, selClause.getSelectValues());
-        }
+        // Here, we support the situations where there is a child plan, and we
+        // have to project the select values specified by the select clause.
+        plan = new ProjectNode(plan, selectValues);
 
         // Now we will support ORDER BY clauses
 
