@@ -8,6 +8,7 @@ import java.util.Map;
 
 import edu.caltech.nanodb.expressions.Aggregate;
 import edu.caltech.nanodb.expressions.FunctionCall;
+import edu.caltech.nanodb.expressions.OrderByExpression;
 import edu.caltech.nanodb.plannodes.*;
 import edu.caltech.nanodb.queryast.SelectValue;
 import org.apache.log4j.Logger;
@@ -118,6 +119,10 @@ public class SimplePlanner extends AbstractPlannerImpl {
         plan = new ProjectNode(plan, selectValues);
 
         // Now we will support ORDER BY clauses
+        List<OrderByExpression> orderBy = selClause.getOrderByExprs();
+        if (!orderBy.isEmpty()) {
+            plan = new SortNode(plan, orderBy);
+        }
 
         plan.prepare();
         return plan;
@@ -127,9 +132,9 @@ public class SimplePlanner extends AbstractPlannerImpl {
                                        Aggregate processor) throws IOException {
         PlanNode fromPlan = null;
         if (fromClause.isBaseTable()) {
-            // If we have this case, then our behavior is as before. Simple! Skiddle dee doo!
+            // If we have this case, then our behavior is as before. Simple!
             System.out.println("completeFromClause.isBase");
-            fromPlan = makeSimpleSelect(fromClause.getTableName(), null, null);
+            fromPlan = makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
         } // Now we need to handle subqueries
         else if (fromClause.isDerivedTable()){
             // If we have this case, then we have to evaluate what's inside the select query first.
