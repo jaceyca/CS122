@@ -168,7 +168,7 @@ public class SimplePlanner extends AbstractPlannerImpl {
         // a derived table, for example.
         if (fromClause.isRenamed())
             fromPlan = new RenameNode(fromPlan, fromClause.getResultName());
-
+        fromPlan.prepare();
         return fromPlan;
     }
 
