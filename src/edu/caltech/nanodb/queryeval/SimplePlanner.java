@@ -95,8 +95,10 @@ public class SimplePlanner extends AbstractPlannerImpl {
             sv.setExpression(e);
         }
 
-        if (!groupByExpressions.isEmpty())
-            plan = new HashedGroupAggregateNode(plan, groupByExpressions, processor.prepareMap());
+        Map<String, FunctionCall> columnReferenceMap = processor.prepareMap();
+
+        if (!groupByExpressions.isEmpty() || !columnReferenceMap.isEmpty())
+            plan = new HashedGroupAggregateNode(plan, groupByExpressions, columnReferenceMap);
 
         // Here, we support the situations where there is a child plan, and we
         // have to project the select values specified by the select clause.
@@ -123,7 +125,6 @@ public class SimplePlanner extends AbstractPlannerImpl {
         else if (fromClause.isJoinExpr()) {
             // If we have an ON clause, then we need to use our Aggregate class to check
             // if that ON clause has an aggregate. It should not have one.
-            // DO THIS CHECK FOR WHERE TOO
             Expression onExpression = fromClause.getOnExpression();
             if (onExpression != null) {
                 onExpression.traverse(processor);

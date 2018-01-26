@@ -49,10 +49,10 @@ public class Aggregate implements ExpressionProcessor {
     }
 
     public Map<String, FunctionCall> prepareMap() {
-        Map<String, FunctionCall> map = new HashMap<>();
+        Map<String, FunctionCall> columnReferenceMap = new HashMap<>();
         for (int i = 0; i < aggregateFunctions.size(); i++) {
-            map.put("#A" + Integer.toString(i+1), aggregateFunctions.get(i));
+            columnReferenceMap.put("#A" + Integer.toString(i+1), aggregateFunctions.get(i));
         }
-        return map;
+        return columnReferenceMap;
     }
 }
