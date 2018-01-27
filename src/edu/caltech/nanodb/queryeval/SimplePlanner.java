@@ -134,7 +134,7 @@ public class SimplePlanner extends AbstractPlannerImpl {
         if (fromClause.isBaseTable()) {
             // If we have this case, then our behavior is as before. Simple!
             System.out.println("completeFromClause.isBase");
-            fromPlan = makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+            fromPlan = makeSimpleSelect(fromClause.getTableName(), null, null);
         } // Now we need to handle subqueries
         else if (fromClause.isDerivedTable()){
             // If we have this case, then we have to evaluate what's inside the select query first.

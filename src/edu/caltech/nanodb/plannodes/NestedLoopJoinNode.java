@@ -4,6 +4,7 @@ package edu.caltech.nanodb.plannodes;
 import java.io.IOException;
 import java.util.List;
 
+import edu.caltech.nanodb.expressions.TupleLiteral;
 import org.apache.log4j.Logger;
 
 import edu.caltech.nanodb.expressions.Expression;
@@ -32,10 +33,15 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
     /** Most recently retrieved tuple of the right relation. */
     private Tuple rightTuple;
 
+    private Tuple prevLeftTuple;
 
     /** Set to true when we have exhausted all tuples from our subplans. */
     private boolean done;
 
+    private boolean matchFound;
+
+    private boolean isLeftOuter;
+    private boolean isRightOuter;
 
     public NestedLoopJoinNode(PlanNode leftChild, PlanNode rightChild,
                 JoinType joinType, Expression predicate) {
@@ -165,9 +171,17 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
     public void initialize() {
         super.initialize();
 
+        if (joinType == JoinType.LEFT_OUTER) {
+            isLeftOuter = true;
+        } else if (joinType == JoinType.RIGHT_OUTER) {
+            isRightOuter = true;
+        }
+
+        matchFound = false;
         done = false;
         leftTuple = null;
         rightTuple = null;
+        prevLeftTuple = null;
     }
 
 
@@ -183,8 +197,19 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
             return null;
 
         while (getTuplesToJoin()) {
-            if (canJoinTuples())
-                return joinTuples(leftTuple, rightTuple);
+            if (!done) {
+                if (canJoinTuples()) {
+                    matchFound = true;
+                    return joinTuples(leftTuple, rightTuple);
+                }
+                else if (!matchFound && isLeftOuter) {
+                    System.out.printf("LeftTuple is: %s ", prevLeftTuple.toString());
+                    return joinTuples(prevLeftTuple, new TupleLiteral(rightSchema.numColumns()));
+                }
+                else if (!matchFound && isRightOuter) {
+                    return joinTuples(new TupleLiteral(rightSchema.numColumns()), rightTuple);
+                }
+            }
         }
 
         return null;
@@ -199,18 +224,18 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
      *         {@code false} if no more pairs of tuples are available to join.
      */
     private boolean getTuplesToJoin() throws IOException {
-//        where to put cleanUp()?
         if (done)
             return false;
-
+        
         System.out.println("getTuplesToJoin");
 
+        // starting the outer loop
         if (leftTuple == null) {
             System.out.println("getTuplesToJoin.nullLeftTuple");
             System.out.printf("LeftChild: %s \n", leftChild.toString());
             System.out.printf("rightChild: %s \n", rightChild.toString());
             System.out.printf("self: %s \n", toString());
-            leftTuple = leftChild.getNextTuple();
+            incrementRight();
             System.out.println("getTuplesToJoin.gotNextLeft");
 
             if (leftTuple == null) {
@@ -218,32 +243,67 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
                 done = true;
                 return false;
             }
+//            rightTuple = rightChild.getNextTuple();
+        }
+        else {
+            incrementRight();
         }
 
-        rightTuple = rightChild.getNextTuple();
-        System.out.println("getTuplesToJoin.gotNextRight");
         // iterate through the left table (outer relation)
         while (leftTuple != null) {
+            System.out.printf("LeftTuple: %s ", leftTuple.toString());
             if (rightTuple != null) {
-                System.out.println("getTuplesToJoin.rightTuple");
+                System.out.printf("RightTuple: %s \n", rightTuple.toString());
+
                 if (canJoinTuples()) {
                     System.out.println("getTuplesToJoin.canJoinTuples");
+//                    incrementRight();
                     return true;
                 }
-                rightTuple = rightChild.getNextTuple();
+                System.out.println("getTuplesToJoin.rightTuple");
+                incrementRight();
+            }
+            else if (isLeftOuter) {
+                System.out.println("isLeft");
+                prevLeftTuple = leftTuple;
+                incrementRight();
+                System.out.println("getTuplesToJoin.gotNextRightAndLeft");
+                return true;
+            }
+            else if (isRightOuter) {
+                System.out.println("isRight");
+                if (canJoinTuples() || leftTuple == null) {
+                    return true;
+                }
+                System.out.println("exitRight");
             }
             // if we have reached the end of the inner relation, we need to reset
             // the tuple back to the start
             else {
                 System.out.println("getTuplesToJoin.resetRight");
-                rightChild.initialize();
-                leftTuple = leftChild.getNextTuple();
-                rightTuple = rightChild.getNextTuple();
+                incrementRight();
             }
         }
         System.out.println("getTuplesToJoin.reachedEnd");
         done = true;
         return false;
+    }
+
+    private void incrementRight() throws IOException {
+        System.out.println("incrementRight");
+        if (rightTuple == null) {
+            rightChild.initialize();
+            leftTuple = leftChild.getNextTuple();
+            rightTuple = rightChild.getNextTuple();
+            if (leftTuple == null) {
+                done = true;
+//                return false;
+            }
+        }
+        else {
+                rightTuple = rightChild.getNextTuple();
+        }
+//        return true;
     }
 
 
