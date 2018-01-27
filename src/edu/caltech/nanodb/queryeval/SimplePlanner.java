@@ -56,7 +56,7 @@ public class SimplePlanner extends AbstractPlannerImpl {
 
         PlanNode plan;
         FromClause fromClause = selClause.getFromClause();
-        System.out.println("makePlan1");
+//        System.out.println("makePlan1");
 
 //        if (selClause.isTrivialProject()) {
 //            System.out.println("makePlan.isTrivial");
@@ -75,7 +75,7 @@ public class SimplePlanner extends AbstractPlannerImpl {
         Aggregate processor = new Aggregate();
         List<SelectValue> selectValues = selClause.getSelectValues();
         List<Expression> groupByExpressions = selClause.getGroupByExprs();
-        System.out.println("makePlan2");
+//        System.out.println("makePlan2");
 
         // First, we complete the FROM clause so we have something to work with. This is the birth of a miracle
         // This will support basic joins (not NATURAL joins or joins with USING). Left and right outer joins
@@ -120,9 +120,8 @@ public class SimplePlanner extends AbstractPlannerImpl {
 
         // Now we will support ORDER BY clauses
         List<OrderByExpression> orderBy = selClause.getOrderByExprs();
-        if (!orderBy.isEmpty()) {
+        if (!orderBy.isEmpty())
             plan = new SortNode(plan, orderBy);
-        }
 
         plan.prepare();
         return plan;
@@ -145,10 +144,10 @@ public class SimplePlanner extends AbstractPlannerImpl {
         else if (fromClause.isJoinExpr()) {
             // If we have an ON clause, then we need to use our Aggregate class to check
             // if that ON clause has an aggregate. It should not have one.
-            System.out.println("completeFromClause.isJoin");
+//            System.out.println("completeFromClause.isJoin");
             Expression onExpression = fromClause.getOnExpression();
             if (onExpression != null) {
-                System.out.println("completeFromClause.hasOnExpression");
+//                System.out.println("completeFromClause.hasOnExpression");
                 onExpression.traverse(processor);
                 if (!processor.aggregateFunctions.isEmpty())
                     throw new IllegalArgumentException("ON clauses cannot have aggregates");
@@ -160,21 +159,15 @@ public class SimplePlanner extends AbstractPlannerImpl {
             FromClause rightFromClause = fromClause.getRightChild();
             PlanNode leftChild = completeFromClause(leftFromClause, selClause, processor);
             PlanNode rightChild = completeFromClause(rightFromClause, selClause, processor);
-            System.out.println("completeFromClause.newNestedLoopJoinNode");
-            if (onExpression == null) {
-                System.out.println("completeFromClause.nullOnExpr");
-                fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
-                        fromClause.getJoinType(), fromClause.getComputedJoinExpr());
-            }
-            else {
-                System.out.println("completeFromClause.onExpr");
-                fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
-                        fromClause.getJoinType(), fromClause.getOnExpression());
-            }
-            if (selClause.getWhereExpr() != null) {
-                fromPlan = new SimpleFilterNode(fromPlan, selClause.getWhereExpr());
-            }
+//            System.out.println("completeFromClause.newNestedLoopJoinNode");
+            fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
+                    fromClause.getJoinType(), fromClause.getOnExpression());
         }
+
+        // Now, we need to check if our from clause has been renamed. This could happen after we select from
+        // a derived table, for example.
+        if (fromClause.isRenamed())
+            fromPlan = new RenameNode(fromPlan, fromClause.getResultName());
         fromPlan.prepare();
         return fromPlan;
     }
