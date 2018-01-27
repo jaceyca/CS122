@@ -267,7 +267,7 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
                 System.out.println("getTuplesToJoin.rightTuple");
                 incrementRight();
             }
-            else if (isLeftOuter) {
+            else if (isLeftOuter && !matchFound) {
                 System.out.println("isLeft");
                 prevLeftTuple = leftTuple;
                 incrementRight();

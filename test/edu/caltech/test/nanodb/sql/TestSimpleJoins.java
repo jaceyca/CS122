@@ -74,7 +74,7 @@ public class TestSimpleJoins extends SqlTestCase {
 
         // RIGHT-OUTER JOIN with only one common column:  A
         result = server.doCommand(
-                "SELECT * FROM test_sj_t1 t1 LEFT JOIN test_sj_t3 t3 ON t1.a = t3.a", true);
+                "SELECT * FROM test_sj_t1 t1 RIGHT JOIN test_sj_t3 t3 ON t1.a = t3.a", true);
         TupleLiteral[] expected3 = {
                 new TupleLiteral(null, null, 0, 0, 0),
                 new TupleLiteral(2, 20, 2, 200, 2000),
