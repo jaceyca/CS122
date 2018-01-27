@@ -176,7 +176,9 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
         } else if (joinType == JoinType.RIGHT_OUTER) {
             isRightOuter = true;
         }
-
+        if (isRightOuter) {
+            swap();
+        }
         matchFound = false;
         done = false;
         leftTuple = null;
@@ -193,13 +195,14 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
      * @throws IOException if a db file failed to open at some point
      */
     public Tuple getNextTuple() throws IOException {
-        if (done)
+        if (done) {
+            System.out.println("done");
             return null;
-
+        }
         while (getTuplesToJoin()) {
             if (!done) {
+                System.out.printf("matchFound is: %s\n", matchFound);
                 if (canJoinTuples()) {
-                    matchFound = true;
                     return joinTuples(leftTuple, rightTuple);
                 }
                 else if (!matchFound && isLeftOuter) {
@@ -207,7 +210,8 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
                     return joinTuples(prevLeftTuple, new TupleLiteral(rightSchema.numColumns()));
                 }
                 else if (!matchFound && isRightOuter) {
-                    return joinTuples(new TupleLiteral(rightSchema.numColumns()), rightTuple);
+                    System.out.printf("RightTuple is: %s ", prevLeftTuple.toString());
+                    return joinTuples(new TupleLiteral(rightSchema.numColumns()), prevLeftTuple);
                 }
             }
         }
@@ -226,9 +230,8 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
     private boolean getTuplesToJoin() throws IOException {
         if (done)
             return false;
-        
-        System.out.println("getTuplesToJoin");
 
+        System.out.println("getTuplesToJoin");
         // starting the outer loop
         if (leftTuple == null) {
             System.out.println("getTuplesToJoin.nullLeftTuple");
@@ -256,6 +259,7 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
                 System.out.printf("RightTuple: %s \n", rightTuple.toString());
 
                 if (canJoinTuples()) {
+                    matchFound = true;
                     System.out.println("getTuplesToJoin.canJoinTuples");
 //                    incrementRight();
                     return true;
@@ -272,10 +276,10 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
             }
             else if (isRightOuter) {
                 System.out.println("isRight");
-                if (canJoinTuples() || leftTuple == null) {
-                    return true;
-                }
+                prevLeftTuple = leftTuple;
+                incrementRight();
                 System.out.println("exitRight");
+                return true;
             }
             // if we have reached the end of the inner relation, we need to reset
             // the tuple back to the start
@@ -295,6 +299,7 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
             rightChild.initialize();
             leftTuple = leftChild.getNextTuple();
             rightTuple = rightChild.getNextTuple();
+            matchFound = false;
             if (leftTuple == null) {
                 done = true;
 //                return false;
