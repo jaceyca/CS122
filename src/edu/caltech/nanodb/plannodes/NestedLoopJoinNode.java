@@ -47,6 +47,9 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
                 JoinType joinType, Expression predicate) {
 
         super(leftChild, rightChild, joinType, predicate);
+        if (joinType == JoinType.RIGHT_OUTER) {
+            super.swap();
+        }
     }
 
 
@@ -177,7 +180,7 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
             isRightOuter = true;
         }
         if (isRightOuter) {
-            swap();
+//            swap();
         }
         matchFound = false;
         done = false;
@@ -274,7 +277,7 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
                 System.out.println("getTuplesToJoin.gotNextRightAndLeft");
                 return true;
             }
-            else if (isRightOuter) {
+            else if (isRightOuter && !matchFound) {
                 System.out.println("isRight");
                 prevLeftTuple = leftTuple;
                 incrementRight();
