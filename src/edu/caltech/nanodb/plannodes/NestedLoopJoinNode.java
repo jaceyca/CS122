@@ -199,21 +199,17 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
      */
     public Tuple getNextTuple() throws IOException {
         if (done) {
-            System.out.println("done");
             return null;
         }
         while (getTuplesToJoin()) {
             if (!done) {
-                System.out.printf("matchFound is: %s\n", matchFound);
                 if (canJoinTuples()) {
                     return joinTuples(leftTuple, rightTuple);
                 }
                 else if (!matchFound && isLeftOuter) {
-                    System.out.printf("LeftTuple is: %s ", prevLeftTuple.toString());
                     return joinTuples(prevLeftTuple, new TupleLiteral(rightSchema.numColumns()));
                 }
                 else if (!matchFound && isRightOuter) {
-                    System.out.printf("RightTuple is: %s ", prevLeftTuple.toString());
                     return joinTuples(new TupleLiteral(rightSchema.numColumns()), prevLeftTuple);
                 }
             }
@@ -234,18 +230,11 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
         if (done)
             return false;
 
-        System.out.println("getTuplesToJoin");
         // starting the outer loop
         if (leftTuple == null) {
-            System.out.println("getTuplesToJoin.nullLeftTuple");
-            System.out.printf("LeftChild: %s \n", leftChild.toString());
-            System.out.printf("rightChild: %s \n", rightChild.toString());
-            System.out.printf("self: %s \n", toString());
             incrementRight();
-            System.out.println("getTuplesToJoin.gotNextLeft");
 
             if (leftTuple == null) {
-                System.out.println("getTuplesToJoin.stillNull");
                 done = true;
                 return false;
             }
@@ -257,47 +246,36 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
 
         // iterate through the left table (outer relation)
         while (leftTuple != null) {
-            System.out.printf("LeftTuple: %s ", leftTuple.toString());
             if (rightTuple != null) {
-                System.out.printf("RightTuple: %s \n", rightTuple.toString());
 
                 if (canJoinTuples()) {
                     matchFound = true;
-                    System.out.println("getTuplesToJoin.canJoinTuples");
 //                    incrementRight();
                     return true;
                 }
-                System.out.println("getTuplesToJoin.rightTuple");
                 incrementRight();
             }
             else if (isLeftOuter && !matchFound) {
-                System.out.println("isLeft");
                 prevLeftTuple = leftTuple;
                 incrementRight();
-                System.out.println("getTuplesToJoin.gotNextRightAndLeft");
                 return true;
             }
             else if (isRightOuter && !matchFound) {
-                System.out.println("isRight");
                 prevLeftTuple = leftTuple;
                 incrementRight();
-                System.out.println("exitRight");
                 return true;
             }
             // if we have reached the end of the inner relation, we need to reset
             // the tuple back to the start
             else {
-                System.out.println("getTuplesToJoin.resetRight");
                 incrementRight();
             }
         }
-        System.out.println("getTuplesToJoin.reachedEnd");
         done = true;
         return false;
     }
 
     private void incrementRight() throws IOException {
-        System.out.println("incrementRight");
         if (rightTuple == null) {
             rightChild.initialize();
             leftTuple = leftChild.getNextTuple();

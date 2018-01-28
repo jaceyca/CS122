@@ -66,7 +66,6 @@ public class SimplePlanner extends AbstractPlannerImpl {
         // Here, we support the situations where there is no child plan,
         // and no expression references a column name
         if (fromClause == null) {
-            System.out.println("makePlan.nullFromClause");
             plan = new ProjectNode(selClause.getSelectValues());
             plan.prepare();
             return plan;
@@ -132,13 +131,11 @@ public class SimplePlanner extends AbstractPlannerImpl {
         PlanNode fromPlan = null;
         if (fromClause.isBaseTable()) {
             // If we have this case, then our behavior is as before. Simple!
-            System.out.println("completeFromClause.isBase");
             fromPlan = makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
         } // Now we need to handle subqueries
         else if (fromClause.isDerivedTable()){
             // If we have this case, then we have to evaluate what's inside the select query first.
             // We can do this by simply recursively calling our makePlan function on that sub-query.
-            System.out.println("completeFromClause.isDerived");
             fromPlan = makePlan(fromClause.getSelectClause(), null);
         }
         else if (fromClause.isJoinExpr()) {
