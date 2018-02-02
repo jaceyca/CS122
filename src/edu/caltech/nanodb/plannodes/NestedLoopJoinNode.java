@@ -166,8 +166,24 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
         // Use the parent class' helper-function to prepare the schema.
         prepareSchemaStats();
 
-        // TODO:  Implement the rest
-        cost = null;
+        float selectivity = SelectivityEstimator.estimateSelectivity(predicate, schema, stats);
+        float tuples = 0;
+        if(joinType == JoinType.INNER || joinType == joinType.LEFT_OUTER)
+        {
+            tuples = selectivity * leftChild.cost.numTuples * rightChild.cost.numTuples;
+        }
+        else if(joinType == JoinType.LEFT_OUTER)
+        {
+            tuples += (1 - selectivity) * leftChild.cost.numTuples;
+        }
+        else if(joinType == JoinType.RIGHT_OUTER)
+        {
+            tuples += (1 - selectivity) * rightChild.cost.numTuples;
+        }
+
+        cost = new PlanCost(tuples, leftChild.cost.tupleSize + rightChild.cost.tupleSize,
+            leftChild.cost.cpuCost + rightChild.cost.cpuCost + (leftChild.cost.numTuples * rightChild.cost.numTuples),
+            rightChild.cost.numBlockIOs + leftChild.cost.numBlockIOs);
     }
 
 
