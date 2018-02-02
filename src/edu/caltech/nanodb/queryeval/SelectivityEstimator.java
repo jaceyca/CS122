@@ -4,19 +4,17 @@ package edu.caltech.nanodb.queryeval;
 import java.util.ArrayList;
 import java.util.HashSet;
 
-import edu.caltech.nanodb.expressions.ArithmeticOperator;
-import edu.caltech.nanodb.expressions.BooleanOperator;
-import edu.caltech.nanodb.expressions.ColumnValue;
-import edu.caltech.nanodb.expressions.CompareOperator;
-import edu.caltech.nanodb.expressions.Expression;
-import edu.caltech.nanodb.expressions.LiteralValue;
-import edu.caltech.nanodb.expressions.TypeConverter;
+import edu.caltech.nanodb.expressions.*;
 
 import edu.caltech.nanodb.relations.ColumnInfo;
 import edu.caltech.nanodb.relations.SQLDataType;
 import edu.caltech.nanodb.relations.Schema;
 
 import org.apache.log4j.Logger;
+
+import static edu.caltech.nanodb.expressions.CompareOperator.Type.GREATER_THAN;
+import static edu.caltech.nanodb.expressions.CompareOperator.Type.LESS_THAN;
+import static edu.caltech.nanodb.expressions.CompareOperator.Type.NOT_EQUALS;
 
 
 /**
@@ -146,19 +144,31 @@ public class SelectivityEstimator {
         Schema exprSchema, ArrayList<ColumnStats> stats) {
 
         float selectivity = 1.0f;
+        ArrayList<Expression> terms = new ArrayList<>();
+        int numTerms = bool.getNumTerms();
+        for (int i = 0; i < numTerms; i++)
+            terms.add(bool.getTerm(i));
 
         switch (bool.getType()) {
         case AND_EXPR:
-            // TODO:  Compute selectivity of AND expression.
+            // Our assumption here is that conditions are independent of each other
+            // To compute AND, we just multiply each selectivity
+            for (Expression term : terms)
+                selectivity *= estimateSelectivity(term, exprSchema, stats);
             break;
 
         case OR_EXPR:
-            // TODO:  Compute selectivity of OR expression.
+            // To compute OR, we compute the probability that a tuple satisfies at
+            // least one condition, which is (1-probability it satisfies none of them)
+            for (Expression term : terms)
+                selectivity *= 1 - estimateSelectivity(term, exprSchema, stats);
+            selectivity = 1 - selectivity;
             break;
 
         case NOT_EXPR:
-            // TODO:  Compute selectivity of NOT expression.
+            selectivity = 1 - estimateSelectivity(terms.get(0), exprSchema, stats);
             break;
+
 
         default:
             // Shouldn't have any other Boolean expression types.
@@ -262,19 +272,29 @@ public class SelectivityEstimator {
         SQLDataType sqlType = colInfo.getType().getBaseType();
         ColumnStats colStats = stats.get(colIndex);
 
+        // First, we check if the statistics are unknown. If they are unknown, then the
+        // function colStats.getNumNullValues() should return -1. Note that we could
+        // use other functions, but this should be sufficient. In the case that we
+        // have an unknown value, we return DEFAULT_SELECTIVITY
+        if (colStats.getNumNullValues() == -1)
+            return selectivity;
+
         Object value = literalValue.evaluate();
 
         switch (compType) {
         case EQUALS:
         case NOT_EQUALS:
             // Compute the equality value.  Then, if inequality, invert the
-            // result.
+            // result. To compute equality, we will assume a unique distribution
+            // of different values of A so we estimate P(A=v)=1/V(A,r).
 
             // TODO:  Compute the selectivity.  Note that the ColumnStats type
             //        will return special values to indicate "unknown" stats;
             //        your code should detect when this is the case, and fall
             //        back on the default selectivity.
-
+            selectivity = 1/colStats.getNumUniqueValues();
+            if (compType == NOT_EQUALS)
+                selectivity = 1 - selectivity;
             break;
 
         case GREATER_OR_EQUAL:
@@ -287,10 +307,20 @@ public class SelectivityEstimator {
 
             if (typeSupportsCompareEstimates(sqlType) &&
                 colStats.hasDifferentMinMaxValues()) {
+                Object minVal = colStats.getMinValue();
+                Object maxVal = colStats.getMaxValue();
 
                 // TODO:  Compute the selectivity.  The if-condition ensures
                 //        that you will only compute selectivities if the type
                 //        supports it, and if there are valid stats.
+                if (value < minVal)
+                    selectivity = 1;
+                else if (value > maxVal)
+                    selectivity = 0;
+                else
+                    selectivity = (maxVal - value) / (maxVal - minVal);
+                if (compType == LESS_THAN)
+                    selectivity = 1 - selectivity;
             }
 
             break;
@@ -305,9 +335,19 @@ public class SelectivityEstimator {
 
             if (typeSupportsCompareEstimates(sqlType) &&
                 colStats.hasDifferentMinMaxValues()) {
+                Object minVal = colStats.getMinValue();
+                Object maxVal = colStats.getMaxValue();
 
                 // TODO:  Compute the selectivity.  Watch out for copy-paste
                 //        bugs...
+                if (value < minVal)
+                    selectivity = 0;
+                else if (value > maxVal)
+                    selectivity = 1;
+                else
+                    selectivity = (value - minVal) / (maxVal - minVal);
+                if (compType == GREATER_THAN)
+                    selectivity = 1 - selectivity;
             }
 
             break;
@@ -359,6 +399,9 @@ public class SelectivityEstimator {
         //        will return special values to indicate "unknown" stats;
         //        your code should detect when this is the case, and fall
         //        back on the default selectivity.
+        if (colOneStats.getNumNullValues() == -1 || colTwoStats.getNumNullValues() == -1)
+            return selectivity;
+
 
         return selectivity;
     }
