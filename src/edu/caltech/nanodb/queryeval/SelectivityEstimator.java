@@ -280,7 +280,7 @@ public class SelectivityEstimator {
             return selectivity;
 
         Object value = literalValue.evaluate();
-
+        Comparable<Object> valueComparable = (Comparable<Object>) value;
         switch (compType) {
         case EQUALS:
         case NOT_EQUALS:
@@ -310,15 +310,12 @@ public class SelectivityEstimator {
                 Object minVal = colStats.getMinValue();
                 Object maxVal = colStats.getMaxValue();
 
-                // TODO:  Compute the selectivity.  The if-condition ensures
-                //        that you will only compute selectivities if the type
-                //        supports it, and if there are valid stats.
-                if (value < minVal)
+                if (valueComparable.compareTo(minVal) < 0)
                     selectivity = 1;
-                else if (value > maxVal)
+                else if (valueComparable.compareTo(maxVal) > 0)
                     selectivity = 0;
-                else
-                    selectivity = (maxVal - value) / (maxVal - minVal);
+                else // Compute selectivity = (maxVal - value) / (maxVal - minVal);
+                    selectivity = computeRatio(value, maxVal, minVal, maxVal);
                 if (compType == LESS_THAN)
                     selectivity = 1 - selectivity;
             }
@@ -338,14 +335,12 @@ public class SelectivityEstimator {
                 Object minVal = colStats.getMinValue();
                 Object maxVal = colStats.getMaxValue();
 
-                // TODO:  Compute the selectivity.  Watch out for copy-paste
-                //        bugs...
-                if (value < minVal)
+                if (valueComparable.compareTo(minVal) < 0)
                     selectivity = 0;
-                else if (value > maxVal)
+                else if (valueComparable.compareTo(maxVal) > 0)
                     selectivity = 1;
-                else
-                    selectivity = (value - minVal) / (maxVal - minVal);
+                else // Compute selectivity = (value - minVal) / (maxVal - minVal)
+                    selectivity = computeRatio(minVal, value, minVal, maxVal);
                 if (compType == GREATER_THAN)
                     selectivity = 1 - selectivity;
             }
@@ -395,13 +390,29 @@ public class SelectivityEstimator {
         ColumnStats colOneStats = stats.get(colOneIndex);
         ColumnStats colTwoStats = stats.get(colTwoIndex);
 
-        // TODO:  Compute the selectivity.  Note that the ColumnStats type
+        //        Note that the ColumnStats type
         //        will return special values to indicate "unknown" stats;
         //        your code should detect when this is the case, and fall
         //        back on the default selectivity.
         if (colOneStats.getNumNullValues() == -1 || colTwoStats.getNumNullValues() == -1)
             return selectivity;
 
+        // Compute useful values
+        Comparable<Object> minVal1 = (Comparable<Object>) colOneStats.getMinValue();
+        Comparable<Object> maxVal1 = (Comparable<Object>) colOneStats.getMaxValue();
+        Comparable<Object> minVal2 = (Comparable<Object>) colTwoStats.getMinValue();
+        Comparable<Object> maxVal2 = (Comparable<Object>) colTwoStats.getMaxValue();
+
+        if (minVal1.compareTo(maxVal2) > 0 || minVal2.compareTo(maxVal1) > 0)
+            selectivity = 0;
+        else {
+            // We will use a very naive way to calculate the selectivity for comparing columns.
+            // We will just take the maximum value for the number of unique values both
+            // columns. Then, we will just return 1/maxNumUniques. This is naive because
+            // it assumes a uniform distribution, much like our other calculations.
+            int maxNumUniques = Math.max(colOneStats.getNumUniqueValues(), colTwoStats.getNumUniqueValues());
+            selectivity = 1 / maxNumUniques;
+        }
 
         return selectivity;
     }
