@@ -172,7 +172,7 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
         {
             tuples = selectivity * leftChild.cost.numTuples * rightChild.cost.numTuples;
         }
-        else if(joinType == JoinType.LEFT_OUTER)
+        if(joinType == JoinType.LEFT_OUTER)
         {
             tuples += (1 - selectivity) * leftChild.cost.numTuples;
         }
