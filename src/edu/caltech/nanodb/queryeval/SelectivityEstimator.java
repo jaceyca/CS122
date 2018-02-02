@@ -115,7 +115,9 @@ public class SelectivityEstimator {
             CompareOperator comp = (CompareOperator) expr;
             selectivity = estimateCompareSelectivity(comp, exprSchema, stats);
         }
-
+        else if (expr == null) {
+            selectivity = 1.0f;
+        }
         return selectivity;
     }
 
