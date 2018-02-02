@@ -161,12 +161,12 @@ public class SelectivityEstimator {
             // To compute OR, we compute the probability that a tuple satisfies at
             // least one condition, which is (1-probability it satisfies none of them)
             for (Expression term : terms)
-                selectivity *= 1 - estimateSelectivity(term, exprSchema, stats);
-            selectivity = 1 - selectivity;
+                selectivity *= 1.0f - estimateSelectivity(term, exprSchema, stats);
+            selectivity = 1.0f - selectivity;
             break;
 
         case NOT_EXPR:
-            selectivity = 1 - estimateSelectivity(terms.get(0), exprSchema, stats);
+            selectivity = 1.0f - estimateSelectivity(terms.get(0), exprSchema, stats);
             break;
 
 
@@ -276,7 +276,7 @@ public class SelectivityEstimator {
         // function colStats.getNumNullValues() should return -1. Note that we could
         // use other functions, but this should be sufficient. In the case that we
         // have an unknown value, we return DEFAULT_SELECTIVITY
-        if (colStats.getNumNullValues() == -1)
+        if (colStats.getNumNullValues() == -1 || colStats.getNumUniqueValues() == -1)
             return selectivity;
 
         Object value = literalValue.evaluate();
@@ -288,13 +288,13 @@ public class SelectivityEstimator {
             // result. To compute equality, we will assume a unique distribution
             // of different values of A so we estimate P(A=v)=1/V(A,r).
 
-            // TODO:  Compute the selectivity.  Note that the ColumnStats type
-            //        will return special values to indicate "unknown" stats;
-            //        your code should detect when this is the case, and fall
-            //        back on the default selectivity.
-            selectivity = 1/colStats.getNumUniqueValues();
+            // Compute the selectivity.  Note that the ColumnStats type
+            // will return special values to indicate "unknown" stats;
+            // this code detects when this is the case, and falls
+            // back on the default selectivity.
+            selectivity = 1.0f /colStats.getNumUniqueValues();
             if (compType == NOT_EQUALS)
-                selectivity = 1 - selectivity;
+                selectivity = 1.0f - selectivity;
             break;
 
         case GREATER_OR_EQUAL:
@@ -317,7 +317,7 @@ public class SelectivityEstimator {
                 else // Compute selectivity = (maxVal - value) / (maxVal - minVal);
                     selectivity = computeRatio(value, maxVal, minVal, maxVal);
                 if (compType == LESS_THAN)
-                    selectivity = 1 - selectivity;
+                    selectivity = 1.0f - selectivity;
             }
 
             break;
@@ -342,7 +342,7 @@ public class SelectivityEstimator {
                 else // Compute selectivity = (value - minVal) / (maxVal - minVal)
                     selectivity = computeRatio(minVal, value, minVal, maxVal);
                 if (compType == GREATER_THAN)
-                    selectivity = 1 - selectivity;
+                    selectivity = 1.0f - selectivity;
             }
 
             break;
@@ -394,7 +394,8 @@ public class SelectivityEstimator {
         //        will return special values to indicate "unknown" stats;
         //        your code should detect when this is the case, and fall
         //        back on the default selectivity.
-        if (colOneStats.getNumNullValues() == -1 || colTwoStats.getNumNullValues() == -1)
+        if (colOneStats.getNumNullValues() == -1 || colTwoStats.getNumNullValues() == -1 ||
+                colOneStats.getNumUniqueValues() == -1 || colTwoStats.getNumUniqueValues() == -1)
             return selectivity;
 
         // Compute useful values
@@ -411,7 +412,11 @@ public class SelectivityEstimator {
             // columns. Then, we will just return 1/maxNumUniques. This is naive because
             // it assumes a uniform distribution, much like our other calculations.
             int maxNumUniques = Math.max(colOneStats.getNumUniqueValues(), colTwoStats.getNumUniqueValues());
-            selectivity = 1 / maxNumUniques;
+            selectivity = 1.0f / maxNumUniques;
+
+            if (compType == NOT_EQUALS) {
+                selectivity = 1.0f - selectivity;
+            }
         }
 
         return selectivity;

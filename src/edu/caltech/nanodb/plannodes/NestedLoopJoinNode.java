@@ -168,7 +168,8 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
 
         float selectivity = SelectivityEstimator.estimateSelectivity(predicate, schema, stats);
         float tuples = 0;
-        if(joinType == JoinType.INNER || joinType == joinType.LEFT_OUTER)
+
+        if(joinType == JoinType.INNER || joinType == JoinType.LEFT_OUTER || joinType == JoinType.CROSS)
         {
             tuples = selectivity * leftChild.cost.numTuples * rightChild.cost.numTuples;
         }

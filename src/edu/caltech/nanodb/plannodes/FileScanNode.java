@@ -227,11 +227,10 @@ public class FileScanNode extends SelectNode {
         TableStats tableStats = tupleFile.getStats();
         ArrayList<ColumnStats> fileStats = tableStats.getAllColumnStats();
 
-        // TODO:  Compute the cost of the plan node!
-        float tups = SelectivityEstimator.estimateSelectivity(predicate, 
+        float tuples = SelectivityEstimator.estimateSelectivity(predicate,
             schema, fileStats) * tableStats.numTuples;
 
-        cost = new PlanCost(tups, tableStats.avgTupleSize, 
+        cost = new PlanCost(tuples, tableStats.avgTupleSize,
             tableStats.numTuples, tableStats.numDataPages);
 
         // NOTE:  Normally we would also update the table statistics based on
