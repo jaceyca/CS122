@@ -58,10 +58,10 @@ public class SimplePlanner extends AbstractPlannerImpl {
         FromClause fromClause = selClause.getFromClause();
 //        System.out.println("makePlan1");
 
-//        if (selClause.isTrivialProject()) {
-//            System.out.println("makePlan.isTrivial");
-//            return makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
-//        }
+        if (selClause.isTrivialProject()) {
+            System.out.println("makePlan.isTrivial");
+            return makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+        }
 
         // Here, we support the situations where there is no child plan,
         // and no expression references a column name

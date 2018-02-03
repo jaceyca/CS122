@@ -182,8 +182,9 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
             tuples += (1 - selectivity) * rightChild.cost.numTuples;
         }
 
+        float cpuCost = leftChild.cost.cpuCost + rightChild.cost.cpuCost + (leftChild.cost.numTuples * rightChild.cost.numTuples);
         cost = new PlanCost(tuples, leftChild.cost.tupleSize + rightChild.cost.tupleSize,
-            leftChild.cost.cpuCost + rightChild.cost.cpuCost + (leftChild.cost.numTuples * rightChild.cost.numTuples),
+            cpuCost * 2,
             rightChild.cost.numBlockIOs + leftChild.cost.numBlockIOs);
     }
 
