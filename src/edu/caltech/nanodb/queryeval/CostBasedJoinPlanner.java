@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import edu.caltech.nanodb.expressions.PredicateUtils;
 import org.apache.log4j.Logger;
 
 import edu.caltech.nanodb.expressions.Expression;
@@ -215,9 +216,13 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
 
     /**
      * This helper method pulls the essential details for join optimization
-     * out of a <tt>FROM</tt> clause.
-     *
-     * TODO:  FILL IN DETAILS.
+     * out of a <tt>FROM</tt> clause. This method considers base-tables,
+     * subqueries, and outer-joins to be leaves. If the fromClause is a leaf,
+     * then we add it to the list leafFromClauses. If fromClause is not a
+     * leaf, only then can we collect conjuncts. We must also recursively
+     * check the left and right children of fromClause (if it is a join
+     * expression) because those children may be leaves, or they may
+     * be more join expressions that we must collect conjuncts from as well.
      *
      * @param fromClause the from-clause to collect details from
      *
@@ -226,9 +231,14 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
      * @param leafFromClauses the collection to add all leaf from-clauses to
      */
     private void collectDetails(FromClause fromClause,
-        HashSet<Expression> conjuncts, ArrayList<FromClause> leafFromClauses) {
-
-        // TODO:  IMPLEMENT
+                                HashSet<Expression> conjuncts, ArrayList<FromClause> leafFromClauses) {
+        if (fromClause.isBaseTable() || fromClause.isDerivedTable() || fromClause.isOuterJoin())
+            leafFromClauses.add(fromClause);
+        else {
+            PredicateUtils.collectConjuncts(fromClause.getComputedJoinExpr(), conjuncts);
+            collectDetails(fromClause.getLeftChild(), conjuncts, leafFromClauses);
+            collectDetails(fromClause.getRightChild(), conjuncts, leafFromClauses);
+        }
     }
 
 
