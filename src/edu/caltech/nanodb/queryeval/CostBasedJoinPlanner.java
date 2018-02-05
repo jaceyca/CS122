@@ -216,7 +216,9 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
 
     /**
      * This helper method pulls the essential details for join optimization
-     * out of a <tt>FROM</tt> clause. This method considers base-tables,
+     * out of a <tt>FROM</tt> clause. 
+     *
+     * This method considers base-tables,
      * subqueries, and outer-joins to be leaves. If the fromClause is a leaf,
      * then we add it to the list leafFromClauses. If fromClause is not a
      * leaf, only then can we collect conjuncts. We must also recursively
@@ -231,13 +233,21 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
      * @param leafFromClauses the collection to add all leaf from-clauses to
      */
     private void collectDetails(FromClause fromClause,
-                                HashSet<Expression> conjuncts, ArrayList<FromClause> leafFromClauses) {
-        if (fromClause.isBaseTable() || fromClause.isDerivedTable() || fromClause.isOuterJoin())
+        HashSet<Expression> conjuncts, ArrayList<FromClause> leafFromClauses) {
+        if (fromClause.isBaseTable() || fromClause.isDerivedTable() || 
+            (fromClause.isOuterJoin() && fromClause.isJoinExpr()))
             leafFromClauses.add(fromClause);
         else {
+            PredicateUtils.collectConjuncts(fromClause.getOnExpression(), conjuncts);
             PredicateUtils.collectConjuncts(fromClause.getComputedJoinExpr(), conjuncts);
-            collectDetails(fromClause.getLeftChild(), conjuncts, leafFromClauses);
+            if(fromClause.getLeftChild() != null)
+            {
+                collectDetails(fromClause.getLeftChild(), conjuncts, leafFromClauses);
+            }
+            if(fromClause.getRightChild() != null)
+            {
             collectDetails(fromClause.getRightChild(), conjuncts, leafFromClauses);
+            }
         }
     }
 
