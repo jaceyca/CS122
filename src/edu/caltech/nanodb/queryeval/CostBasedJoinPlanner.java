@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import edu.caltech.nanodb.expressions.PredicateUtils;
 import org.apache.log4j.Logger;
 
 import edu.caltech.nanodb.expressions.Expression;
@@ -20,6 +21,9 @@ import edu.caltech.nanodb.plannodes.SelectNode;
 import edu.caltech.nanodb.queryast.FromClause;
 import edu.caltech.nanodb.queryast.SelectClause;
 import edu.caltech.nanodb.relations.TableInfo;
+
+import edu.caltech.nanodb.plannodes.NestedLoopJoinNode;
+import edu.caltech.nanodb.relations.JoinType;
 
 
 /**
@@ -215,9 +219,15 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
 
     /**
      * This helper method pulls the essential details for join optimization
-     * out of a <tt>FROM</tt> clause.
+     * out of a <tt>FROM</tt> clause. 
      *
-     * TODO:  FILL IN DETAILS.
+     * This method considers base-tables,
+     * subqueries, and outer-joins to be leaves. If the fromClause is a leaf,
+     * then we add it to the list leafFromClauses. If fromClause is not a
+     * leaf, only then can we collect conjuncts. We must also recursively
+     * check the left and right children of fromClause (if it is a join
+     * expression) because those children may be leaves, or they may
+     * be more join expressions that we must collect conjuncts from as well.
      *
      * @param fromClause the from-clause to collect details from
      *
@@ -227,8 +237,21 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
      */
     private void collectDetails(FromClause fromClause,
         HashSet<Expression> conjuncts, ArrayList<FromClause> leafFromClauses) {
-
-        // TODO:  IMPLEMENT
+        if (fromClause.isBaseTable() || fromClause.isDerivedTable() || 
+            (fromClause.isOuterJoin() && fromClause.isJoinExpr()))
+            leafFromClauses.add(fromClause);
+        else {
+            PredicateUtils.collectConjuncts(fromClause.getOnExpression(), conjuncts);
+            PredicateUtils.collectConjuncts(fromClause.getComputedJoinExpr(), conjuncts);
+            if(fromClause.getLeftChild() != null)
+            {
+                collectDetails(fromClause.getLeftChild(), conjuncts, leafFromClauses);
+            }
+            if(fromClause.getRightChild() != null)
+            {
+            collectDetails(fromClause.getRightChild(), conjuncts, leafFromClauses);
+            }
+        }
     }
 
 
@@ -364,9 +387,56 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             HashMap<HashSet<PlanNode>, JoinComponent> nextJoinPlans =
                 new HashMap<>();
 
-            // TODO:  IMPLEMENT THE CODE THAT GENERATES OPTIMAL PLANS THAT
-            //        JOIN N + 1 LEAVES
+            for(JoinComponent plan : joinPlans.values())
+            { 
+                for(JoinComponent leaf : leafComponents)
+                {
+                    if(plan.leavesUsed.contains(leaf.joinPlan))
+                    { //if the leaf is already in the plan
+                        continue;
+                    }
 
+                    //getting the conjuncts
+                    HashSet<Expression> usedconjuncts = new HashSet<Expression>();
+                    PredicateUtils.findExprsUsingSchemas(conjuncts, false, usedconjuncts, plan.joinPlan.getSchema(), leaf.joinPlan.getSchema());
+                    
+                    //computing the set difference
+                    usedconjuncts.removeAll(plan.conjunctsUsed);
+                    usedconjuncts.removeAll(leaf.conjunctsUsed);
+
+                    Expression predicate_p = PredicateUtils.makePredicate(usedconjuncts);
+
+                    //starting up a new plan
+                    PlanNode tempPlan = new NestedLoopJoinNode(plan.joinPlan, leaf.joinPlan, JoinType.INNER, predicate_p);
+                    tempPlan.prepare();
+                    PlanCost tempPlanCost = tempPlan.getCost();
+
+                    //getting the leaves
+                    HashSet<PlanNode> usedleafs = new HashSet<>();
+                    usedleafs.addAll(plan.leavesUsed);
+                    usedleafs.addAll(leaf.leavesUsed);
+
+                    //computing the set union by adding in the conjuncts
+                    usedconjuncts.addAll(plan.conjunctsUsed);
+                    usedconjuncts.addAll(leaf.conjunctsUsed);
+
+                    //dynamic programming part, storing the plan
+                    //if we already have a plan that has all the leaves
+                    JoinComponent tempJoin = new JoinComponent(tempPlan, usedleafs, usedconjuncts);
+                    if(nextJoinPlans.containsKey(usedleafs))
+                    {
+                        PlanCost oldcost = nextJoinPlans.get(usedleafs).joinPlan.getCost();
+                        if(tempPlanCost.cpuCost < oldcost.cpuCost)
+                        { //replace the old plan with this new one
+                            nextJoinPlans.put(usedleafs, tempJoin);
+                        }
+                    }
+                    else
+                    { //otherwise, adding the new plan to the map
+                        nextJoinPlans.put(usedleafs, tempJoin);
+                    }
+                }
+            }
             // Now that we have generated all plans joining N leaves, time to
             // create all plans joining N + 1 leaves.
             joinPlans = nextJoinPlans;

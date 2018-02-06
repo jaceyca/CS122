@@ -524,6 +524,7 @@ setup_testSimpleJoins = \
     INSERT INTO test_sj_t3 VALUES ( 8,  800,  8000); \
     INSERT INTO test_sj_t3 VALUES ( 9,  900,  9000); \
     INSERT INTO test_sj_t3 VALUES (11, 1100, 11000); \
+    INSERT INTO test_sj_t3 VALUES (8, 555, 555); \
     INSERT INTO test_sj_t4 VALUES ( 2,  200); \
     INSERT INTO test_sj_t4 VALUES ( 5,  600); \
     INSERT INTO test_sj_t4 VALUES ( 6,  500); \

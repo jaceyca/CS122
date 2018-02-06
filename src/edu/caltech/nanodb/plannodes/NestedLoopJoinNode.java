@@ -4,6 +4,7 @@ package edu.caltech.nanodb.plannodes;
 import java.io.IOException;
 import java.util.List;
 
+import edu.caltech.nanodb.expressions.TupleLiteral;
 import org.apache.log4j.Logger;
 
 import edu.caltech.nanodb.expressions.Expression;
@@ -32,15 +33,23 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
     /** Most recently retrieved tuple of the right relation. */
     private Tuple rightTuple;
 
+    private Tuple prevLeftTuple;
 
     /** Set to true when we have exhausted all tuples from our subplans. */
     private boolean done;
 
+    private boolean matchFound;
+
+    private boolean isLeftOuter;
+    private boolean isRightOuter;
 
     public NestedLoopJoinNode(PlanNode leftChild, PlanNode rightChild,
                 JoinType joinType, Expression predicate) {
 
         super(leftChild, rightChild, joinType, predicate);
+        if (joinType == JoinType.RIGHT_OUTER) {
+            super.swap();
+        }
     }
 
 
@@ -157,17 +166,45 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
         // Use the parent class' helper-function to prepare the schema.
         prepareSchemaStats();
 
-        // TODO:  Implement the rest
-        cost = null;
+        float selectivity = SelectivityEstimator.estimateSelectivity(predicate, schema, stats);
+        float tuples = 0;
+
+        if(joinType == JoinType.INNER || joinType == JoinType.LEFT_OUTER || joinType == JoinType.CROSS)
+        {
+            tuples = selectivity * leftChild.cost.numTuples * rightChild.cost.numTuples;
+        }
+        if(joinType == JoinType.LEFT_OUTER)
+        {
+            tuples += (1 - selectivity) * leftChild.cost.numTuples;
+        }
+        else if(joinType == JoinType.RIGHT_OUTER)
+        {
+            tuples += (1 - selectivity) * rightChild.cost.numTuples;
+        }
+
+        float cpuCost = leftChild.cost.cpuCost + rightChild.cost.cpuCost + (leftChild.cost.numTuples * rightChild.cost.numTuples);
+        cost = new PlanCost(tuples, leftChild.cost.tupleSize + rightChild.cost.tupleSize,
+            cpuCost * 2,
+            rightChild.cost.numBlockIOs + leftChild.cost.numBlockIOs);
     }
 
 
     public void initialize() {
         super.initialize();
 
+        if (joinType == JoinType.LEFT_OUTER) {
+            isLeftOuter = true;
+        } else if (joinType == JoinType.RIGHT_OUTER) {
+            isRightOuter = true;
+        }
+        if (isRightOuter) {
+//            swap();
+        }
+        matchFound = false;
         done = false;
         leftTuple = null;
         rightTuple = null;
+        prevLeftTuple = null;
     }
 
 
@@ -179,12 +216,21 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
      * @throws IOException if a db file failed to open at some point
      */
     public Tuple getNextTuple() throws IOException {
-        if (done)
+        if (done) {
             return null;
-
+        }
         while (getTuplesToJoin()) {
-            if (canJoinTuples())
-                return joinTuples(leftTuple, rightTuple);
+            if (!done) {
+                if (canJoinTuples()) {
+                    return joinTuples(leftTuple, rightTuple);
+                }
+                else if (!matchFound && isLeftOuter) {
+                    return joinTuples(prevLeftTuple, new TupleLiteral(rightSchema.numColumns()));
+                }
+                else if (!matchFound && isRightOuter) {
+                    return joinTuples(new TupleLiteral(rightSchema.numColumns()), prevLeftTuple);
+                }
+            }
         }
 
         return null;
@@ -202,26 +248,66 @@ public class NestedLoopJoinNode extends ThetaJoinNode {
         if (done)
             return false;
 
+        // starting the outer loop
         if (leftTuple == null) {
-            leftTuple = leftChild.getNextTuple();
+            incrementRight();
+
+            if (leftTuple == null) {
+                done = true;
+                return false;
+            }
+//            rightTuple = rightChild.getNextTuple();
+        }
+        else {
+            incrementRight();
         }
 
-//        if (rightTuple == null) {
-//            rightChild.initialize();
-//            rightTuple = rightChild.getNextTuple();
-//        }
-
+        // iterate through the left table (outer relation)
         while (leftTuple != null) {
             if (rightTuple != null) {
-                rightTuple = rightChild.getNextTuple();
+
+                if (canJoinTuples()) {
+                    matchFound = true;
+//                    incrementRight();
+                    return true;
+                }
+                incrementRight();
+            }
+            else if (isLeftOuter && !matchFound) {
+                prevLeftTuple = leftTuple;
+                incrementRight();
                 return true;
-            } else {
-                rightChild.initialize();
-                leftTuple = leftChild.getNextTuple();
-                rightTuple = rightChild.getNextTuple();
+            }
+            else if (isRightOuter && !matchFound) {
+                prevLeftTuple = leftTuple;
+                incrementRight();
+                return true;
+            }
+            // if we have reached the end of the inner relation, we need to reset
+            // the tuple back to the start
+            else {
+                incrementRight();
             }
         }
+        done = true;
         return false;
+    }
+
+    private void incrementRight() throws IOException {
+        if (rightTuple == null) {
+            rightChild.initialize();
+            leftTuple = leftChild.getNextTuple();
+            rightTuple = rightChild.getNextTuple();
+            matchFound = false;
+            if (leftTuple == null) {
+                done = true;
+//                return false;
+            }
+        }
+        else {
+                rightTuple = rightChild.getNextTuple();
+        }
+//        return true;
     }
 
 

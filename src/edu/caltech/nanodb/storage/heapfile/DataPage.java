@@ -227,7 +227,7 @@ public class DataPage {
         // We will store a INTEGER at the end. As in PageTuple.getStorageSize(),
         // SMALLINT has a size of 2. For reference, INTEGER has a size of 4. Maybe
         // we can use TINYINT (size of 1) to save more space.
-        return dbPage.getPageSize() -  4;
+        return dbPage.getPageSize();
     }
 
 

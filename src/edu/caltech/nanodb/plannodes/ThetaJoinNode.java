@@ -123,11 +123,6 @@ public abstract class ThetaJoinNode extends PlanNode {
     public void initialize() {
         super.initialize();
 
-        if (joinType != JoinType.CROSS && joinType != JoinType.INNER) {
-            throw new UnsupportedOperationException(
-                "We don't support joins of type " + joinType + " yet!");
-        }
-
         leftChild.initialize();
         rightChild.initialize();
     }
