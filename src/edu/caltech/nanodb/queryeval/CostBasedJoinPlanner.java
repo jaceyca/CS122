@@ -3,26 +3,17 @@ package edu.caltech.nanodb.queryeval;
 
 import java.io.IOException;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-import edu.caltech.nanodb.expressions.PredicateUtils;
+import edu.caltech.nanodb.expressions.*;
+import edu.caltech.nanodb.plannodes.*;
+import edu.caltech.nanodb.queryast.SelectValue;
 import org.apache.log4j.Logger;
 
-import edu.caltech.nanodb.expressions.Expression;
-import edu.caltech.nanodb.plannodes.FileScanNode;
-import edu.caltech.nanodb.plannodes.PlanNode;
-import edu.caltech.nanodb.plannodes.SelectNode;
 import edu.caltech.nanodb.queryast.FromClause;
 import edu.caltech.nanodb.queryast.SelectClause;
 import edu.caltech.nanodb.relations.TableInfo;
 
-import edu.caltech.nanodb.plannodes.NestedLoopJoinNode;
 import edu.caltech.nanodb.relations.JoinType;
 
 
@@ -128,8 +119,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
     public PlanNode makePlan(SelectClause selClause,
         List<SelectClause> enclosingSelects) throws IOException {
 
-        // TODO:  Implement!
-        //
         // This is a very rough sketch of how this function will work,
         // focusing mainly on join planning:
         //
@@ -149,10 +138,125 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         // Supporting other query features, such as grouping/aggregation,
         // various kinds of subqueries, queries without a FROM clause, etc.,
         // can all be incorporated into this sketch relatively easily.
+        if (enclosingSelects != null && !enclosingSelects.isEmpty()) {
+            throw new UnsupportedOperationException(
+                    "Not implemented:  enclosing queries");
+        }
 
-        return null;
+        PlanNode plan;
+        FromClause fromClause = selClause.getFromClause();
+//        System.out.println("makePlan1");
+
+        if (selClause.isTrivialProject()) {
+            System.out.println("makePlan.isTrivial");
+            return makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+        }
+
+        // Here, we support the situations where there is no child plan,
+        // and no expression references a column name
+        if (fromClause == null) {
+            plan = new ProjectNode(selClause.getSelectValues());
+            plan.prepare();
+            return plan;
+        }
+
+        Aggregate processor = new Aggregate();
+        List<SelectValue> selectValues = selClause.getSelectValues();
+        List<Expression> groupByExpressions = selClause.getGroupByExprs();
+//        System.out.println("makePlan2");
+
+        // First, we complete the FROM clause so we have something to work with. This is the birth of a miracle
+        // This will support basic joins (not NATURAL joins or joins with USING). Left and right outer joins
+        // will be supported as well (no full-outer joins) and subqueries in the FROM clause. Also, at this
+        // point, we know we have a FROM clause, so we don't have to check that in completeFromClause.
+        plan = completeFromClause(fromClause, selClause, processor);
+
+        // Now we will support grouping and aggregation. This will support multiple aggregate operations
+        // in a SELECT expression.
+        Expression whereExpression = selClause.getWhereExpr();
+        // Where clauses cannot have aggregates so we check for that here
+        if (whereExpression != null) {
+            whereExpression.traverse(processor);
+            if (!processor.aggregateFunctions.isEmpty())
+                throw new IllegalArgumentException("WHERE clauses cannot have aggregates");
+        }
+
+        for (SelectValue sv : selectValues) {
+            // Skip select-values that aren't expressions
+            if (!sv.isExpression())
+                continue;
+            Expression e = sv.getExpression().traverse(processor);
+            sv.setExpression(e);
+        }
+
+        Map<String, FunctionCall> columnReferenceMap = processor.prepareMap();
+
+        if (!groupByExpressions.isEmpty() || !columnReferenceMap.isEmpty())
+            plan = new HashedGroupAggregateNode(plan, groupByExpressions, columnReferenceMap);
+
+        // Next, we handle HAVING expressions (if one exists) here. WHY THIS NOT WORK
+        if (selClause.getHavingExpr() != null) {
+            Expression havingExpression = selClause.getHavingExpr();
+            havingExpression.traverse(processor);
+            selClause.setHavingExpr(havingExpression);
+            plan = new SimpleFilterNode(plan, havingExpression);
+        }
+
+        // Here, we support the situations where there is a child plan, and we
+        // have to project the select values specified by the select clause.
+        plan = new ProjectNode(plan, selectValues);
+
+        // Now we will support ORDER BY clauses
+        List<OrderByExpression> orderBy = selClause.getOrderByExprs();
+        if (!orderBy.isEmpty())
+            plan = new SortNode(plan, orderBy);
+
+        plan.prepare();
+        return plan;
     }
 
+    public PlanNode completeFromClause(FromClause fromClause, SelectClause selClause,
+                                       Aggregate processor) throws IOException {
+        PlanNode fromPlan = null;
+        if (fromClause.isBaseTable()) {
+            // If we have this case, then our behavior is as before. Simple!
+            fromPlan = makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+        } // Now we need to handle subqueries
+        else if (fromClause.isDerivedTable()){
+            // If we have this case, then we have to evaluate what's inside the select query first.
+            // We can do this by simply recursively calling our makePlan function on that sub-query.
+            fromPlan = makePlan(fromClause.getSelectClause(), null);
+        }
+        else if (fromClause.isJoinExpr()) {
+            // If we have an ON clause, then we need to use our Aggregate class to check
+            // if that ON clause has an aggregate. It should not have one.
+//            System.out.println("completeFromClause.isJoin");
+            Expression onExpression = fromClause.getOnExpression();
+            if (onExpression != null) {
+//                System.out.println("completeFromClause.hasOnExpression");
+                onExpression.traverse(processor);
+                if (!processor.aggregateFunctions.isEmpty())
+                    throw new IllegalArgumentException("ON clauses cannot have aggregates");
+            }
+
+            // In the joins, it is possible that the left and right clauses are derived tables or also joins.
+            // So, we recursively call completeFromClause to complete the set up of those from clauses.
+            FromClause leftFromClause = fromClause.getLeftChild();
+            FromClause rightFromClause = fromClause.getRightChild();
+            PlanNode leftChild = completeFromClause(leftFromClause, selClause, processor);
+            PlanNode rightChild = completeFromClause(rightFromClause, selClause, processor);
+//            System.out.println("completeFromClause.newNestedLoopJoinNode");
+            fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
+                    fromClause.getJoinType(), fromClause.getOnExpression());
+        }
+
+        // Now, we need to check if our from clause has been renamed. This could happen after we select from
+        // a derived table, for example.
+        if (fromClause.isRenamed())
+            fromPlan = new RenameNode(fromPlan, fromClause.getResultName());
+        fromPlan.prepare();
+        return fromPlan;
+    }
 
     /**
      * Given the top-level {@code FromClause} for a SELECT-FROM-WHERE block,
