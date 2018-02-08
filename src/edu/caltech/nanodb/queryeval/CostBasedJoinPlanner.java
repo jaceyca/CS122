@@ -105,7 +105,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         }
     }
 
-
     /**
      * Returns the root of a plan tree suitable for executing the specified
      * query.
@@ -139,6 +138,24 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         // Supporting other query features, such as grouping/aggregation,
         // various kinds of subqueries, queries without a FROM clause, etc.,
         // can all be incorporated into this sketch relatively easily.
+
+        // NOTES: We will proceed similarly as the makePlan() method from SimplePlanner
+        // However, we will not proceed similarly for the following reasons...
+        // We must store conjuncts from WHERE and HAVING before we do anything,
+        // but we also note that we must not push down aggregate functions from the
+        // HAVING clause because those cannot be pushed down. So, we need to find a way
+        // to store the aggregates that are aggregates (maybe use InstanceOf Aggregate)
+        // and we keep those conjuncts. Those conjuncts will then be used where we normally
+        // take care of HAVING clause as in our SimplePlanner.
+        // In the instructions above, it tells us to handle unused conjuncts. These unused
+        // conjuncts are most likely the left over aggregates from the HAVING expression
+        // that we will just handle like we did in SimplePlanner after we do the
+        // makeOptimalJoinPlan. All the other conjuncts we
+        // get from the having, we can add to the makeOptimalJoinPlan. Also, all the WHERE
+        // conjuncts can be put in the makeOptimalJoinPlan because WHERE expressions
+        // should not have any aggregates. We also modify the completeFromClause function
+        // because we only use that if the fromClause is not a Join Expression. If it is,
+        // then we just use makeOptimalJoinPlan.
         if (enclosingSelects != null && !enclosingSelects.isEmpty()) {
             throw new UnsupportedOperationException(
                     "Not implemented:  enclosing queries");
@@ -147,9 +164,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         PlanNode plan = null;
         FromClause fromClause = selClause.getFromClause();
 //        System.out.println("makePlan1");
-
-        if (selClause.isTrivialProject())
-            return makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
 
         // Here, we support the situations where there is no child plan,
         // and no expression references a column name
@@ -216,7 +230,7 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         // Now, we will use the rest of the conjuncts that makeJoinPlan didn't use
         plan = new SimpleFilterNode(plan, PredicateUtils.makePredicate(conjuncts));
 
-        // Here, we support the situations where there is a child plan, and we
+                // Here, we support the situations where there is a child plan, and we
         // have to project the select values specified by the select clause.
         plan = new ProjectNode(plan, selectValues);
 
