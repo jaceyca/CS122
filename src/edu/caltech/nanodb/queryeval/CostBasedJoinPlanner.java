@@ -202,17 +202,9 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
 
         if (!groupByExpressions.isEmpty() || !columnReferenceMap.isEmpty())
             plan = new HashedGroupAggregateNode(plan, groupByExpressions, columnReferenceMap);
-
-        // Next, we handle HAVING expressions (if one exists) here
-        Expression havingExpression = selClause.getHavingExpr();
-        if (havingExpression != null) {
-            havingExpression.traverse(processor);
-            selClause.setHavingExpr(havingExpression);
-            plan = new SimpleFilterNode(plan, havingExpression);
-            PredicateUtils.collectConjuncts(havingExpression, conjuncts);
-        }
-
-        // At this point, we have collected all the conjuncts
+        
+        // At this point, we have collected all the conjuncts (except having???)
+        // Would there any be any unused conjuncts from WHERE clause?
 
         if (fromClause.isJoinExpr()) {
             JoinComponent joinComponent = makeJoinPlan(fromClause, conjuncts);
@@ -225,6 +217,15 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             // will be supported as well (no full-outer joins) and subqueries in the FROM clause. Also, at this
             // point, we know we have a FROM clause, so we don't have to check that in completeFromClause.
             plan = completeFromClause(fromClause, selClause, processor);
+        }
+
+        // Next, we handle HAVING expressions (if one exists) here
+        Expression havingExpression = selClause.getHavingExpr();
+        if (havingExpression != null) {
+            havingExpression.traverse(processor);
+            selClause.setHavingExpr(havingExpression);
+            plan = new SimpleFilterNode(plan, havingExpression);
+//            PredicateUtils.collectConjuncts(havingExpression, conjuncts);
         }
 
         // Now, we will use the rest of the conjuncts that makeJoinPlan didn't use
@@ -255,28 +256,9 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             // We can do this by simply recursively calling our makePlan function on that sub-query.
             fromPlan = makePlan(fromClause.getSelectClause(), null);
         }
-        else if (fromClause.isJoinExpr()) {
-            // If we have an ON clause, then we need to use our Aggregate class to check
-            // if that ON clause has an aggregate. It should not have one.
-//            System.out.println("completeFromClause.isJoin");
-            Expression onExpression = fromClause.getOnExpression();
-            if (onExpression != null) {
-//                System.out.println("completeFromClause.hasOnExpression");
-                onExpression.traverse(processor);
-                if (!processor.aggregateFunctions.isEmpty())
-                    throw new IllegalArgumentException("ON clauses cannot have aggregates");
-            }
 
-            // In the joins, it is possible that the left and right clauses are derived tables or also joins.
-            // So, we recursively call completeFromClause to complete the set up of those from clauses.
-            FromClause leftFromClause = fromClause.getLeftChild();
-            FromClause rightFromClause = fromClause.getRightChild();
-            PlanNode leftChild = completeFromClause(leftFromClause, selClause, processor);
-            PlanNode rightChild = completeFromClause(rightFromClause, selClause, processor);
-//            System.out.println("completeFromClause.newNestedLoopJoinNode");
-            fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
-                    fromClause.getJoinType(), fromClause.getOnExpression());
-        }
+        // We don't need to check if the table is a join table now because we would have done that
+        // using makeJoinPlan
 
         // Now, we need to check if our from clause has been renamed. This could happen after we select from
         // a derived table, for example.
