@@ -292,12 +292,18 @@ public class TestSimpleJoins extends SqlTestCase {
                 new TupleLiteral(7, 70, 700, 7, 70),
                 new TupleLiteral(8, 80, 800, 8, 80)
         };
+        TupleLiteral[] expected2 = {
+                new TupleLiteral(3, 33, 3, 33, 333),
+                new TupleLiteral(7, 70, 7, 70, 700),
+                new TupleLiteral(8, 80, 8, 80, 800)
+        };
         assert checkSizeResults(expected1, result);
-        assert checkUnorderedResults(expected1, result);
         try {
                 checkResultSchema(result, "T2.A", "T2.B", "T2.C", "T7.A", "T7.B");
+                assert checkUnorderedResults(expected1, result);
         } catch (AssertionError e) {
                 checkResultSchema(result, "T7.A", "T7.B", "T2.A", "T2.B", "T2.C");
+                assert checkUnorderedResults(expected2, result);
         }
     }
 }
