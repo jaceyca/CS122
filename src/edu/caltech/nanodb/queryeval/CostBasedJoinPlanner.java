@@ -3,27 +3,19 @@ package edu.caltech.nanodb.queryeval;
 
 import java.io.IOException;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-import edu.caltech.nanodb.expressions.PredicateUtils;
+import edu.caltech.nanodb.expressions.*;
+import edu.caltech.nanodb.plannodes.*;
+import edu.caltech.nanodb.queryast.SelectValue;
 import org.apache.log4j.Logger;
 
-import edu.caltech.nanodb.expressions.Expression;
-import edu.caltech.nanodb.plannodes.FileScanNode;
-import edu.caltech.nanodb.plannodes.PlanNode;
-import edu.caltech.nanodb.plannodes.SelectNode;
 import edu.caltech.nanodb.queryast.FromClause;
 import edu.caltech.nanodb.queryast.SelectClause;
 import edu.caltech.nanodb.relations.TableInfo;
 
-import edu.caltech.nanodb.plannodes.NestedLoopJoinNode;
 import edu.caltech.nanodb.relations.JoinType;
+import sun.java2d.pipe.SpanShapeRenderer;
 
 
 /**
@@ -113,7 +105,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         }
     }
 
-
     /**
      * Returns the root of a plan tree suitable for executing the specified
      * query.
@@ -128,8 +119,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
     public PlanNode makePlan(SelectClause selClause,
         List<SelectClause> enclosingSelects) throws IOException {
 
-        // TODO:  Implement!
-        //
         // This is a very rough sketch of how this function will work,
         // focusing mainly on join planning:
         //
@@ -150,9 +139,134 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         // various kinds of subqueries, queries without a FROM clause, etc.,
         // can all be incorporated into this sketch relatively easily.
 
-        return null;
+        // NOTES: We will proceed similarly as the makePlan() method from SimplePlanner
+        // However, we will not proceed similarly for the following reasons...
+        // We must store conjuncts from WHERE and HAVING before we do anything,
+        // but we also note that we must not push down aggregate functions from the
+        // HAVING clause because those cannot be pushed down. So, we need to find a way
+        // to store the aggregates that are aggregates (maybe use InstanceOf Aggregate)
+        // and we keep those conjuncts. Those conjuncts will then be used where we normally
+        // take care of HAVING clause as in our SimplePlanner.
+        // In the instructions above, it tells us to handle unused conjuncts. These unused
+        // conjuncts are most likely the left over aggregates from the HAVING expression
+        // that we will just handle like we did in SimplePlanner after we do the
+        // makeOptimalJoinPlan. All the other conjuncts we
+        // get from the having, we can add to the makeOptimalJoinPlan. Also, all the WHERE
+        // conjuncts can be put in the makeOptimalJoinPlan because WHERE expressions
+        // should not have any aggregates. We also modify the completeFromClause function
+        // because we only use that if the fromClause is not a Join Expression. If it is,
+        // then we just use makeOptimalJoinPlan.
+        if (enclosingSelects != null && !enclosingSelects.isEmpty()) {
+            throw new UnsupportedOperationException(
+                    "Not implemented:  enclosing queries");
+        }
+
+        PlanNode plan = null;
+        FromClause fromClause = selClause.getFromClause();
+//        System.out.println("makePlan1");
+
+        // Here, we support the situations where there is no child plan,
+        // and no expression references a column name
+        if (fromClause == null) {
+            plan = new ProjectNode(selClause.getSelectValues());
+            plan.prepare();
+            return plan;
+        }
+
+        Aggregate processor = new Aggregate();
+        List<SelectValue> selectValues = selClause.getSelectValues();
+        List<Expression> groupByExpressions = selClause.getGroupByExprs();
+
+
+        HashSet<Expression> conjuncts = new HashSet<>();
+        // Now we will support grouping and aggregation. This will support multiple aggregate operations
+        // in a SELECT expression. We also extract conjuncts from the WHERE expression
+        Expression whereExpression = selClause.getWhereExpr();
+        // Where clauses cannot have aggregates so we check for that here
+        if (whereExpression != null) {
+            whereExpression.traverse(processor);
+            PredicateUtils.collectConjuncts(whereExpression, conjuncts);
+            if (!processor.aggregateFunctions.isEmpty())
+                throw new IllegalArgumentException("WHERE clauses cannot have aggregates");
+        }
+
+        for (SelectValue sv : selectValues) {
+            // Skip select-values that aren't expressions
+            if (!sv.isExpression())
+                continue;
+            Expression e = sv.getExpression().traverse(processor);
+            sv.setExpression(e);
+        }
+
+        Map<String, FunctionCall> columnReferenceMap = processor.prepareMap();
+
+        if (!groupByExpressions.isEmpty() || !columnReferenceMap.isEmpty())
+            plan = new HashedGroupAggregateNode(plan, groupByExpressions, columnReferenceMap);
+        
+        // At this point, we have collected all the conjuncts (except having???)
+        // Would there any be any unused conjuncts from WHERE clause?
+
+        if (fromClause.isJoinExpr()) {
+            JoinComponent joinComponent = makeJoinPlan(fromClause, conjuncts);
+            // Now we must remove all the conjuncts that makeJoinPlan used
+            conjuncts.removeAll(joinComponent.conjunctsUsed);
+            plan = joinComponent.joinPlan;
+        } else {
+            // We complete the FROM clause so we have something to work with. This is the birth of a miracle
+            // This will support basic joins (not NATURAL joins or joins with USING). Left and right outer joins
+            // will be supported as well (no full-outer joins) and subqueries in the FROM clause. Also, at this
+            // point, we know we have a FROM clause, so we don't have to check that in completeFromClause.
+            plan = completeFromClause(fromClause, selClause, processor);
+        }
+
+        // Next, we handle HAVING expressions (if one exists) here
+        Expression havingExpression = selClause.getHavingExpr();
+        if (havingExpression != null) {
+            havingExpression.traverse(processor);
+            selClause.setHavingExpr(havingExpression);
+            plan = new SimpleFilterNode(plan, havingExpression);
+//            PredicateUtils.collectConjuncts(havingExpression, conjuncts);
+        }
+
+        // Now, we will use the rest of the conjuncts that makeJoinPlan didn't use
+        plan = new SimpleFilterNode(plan, PredicateUtils.makePredicate(conjuncts));
+
+                // Here, we support the situations where there is a child plan, and we
+        // have to project the select values specified by the select clause.
+        plan = new ProjectNode(plan, selectValues);
+
+        // Now we will support ORDER BY clauses
+        List<OrderByExpression> orderBy = selClause.getOrderByExprs();
+        if (!orderBy.isEmpty())
+            plan = new SortNode(plan, orderBy);
+
+        plan.prepare();
+        return plan;
     }
 
+    public PlanNode completeFromClause(FromClause fromClause, SelectClause selClause,
+                                       Aggregate processor) throws IOException {
+        PlanNode fromPlan = null;
+        if (fromClause.isBaseTable()) {
+            // If we have this case, then our behavior is as before. Simple!
+            fromPlan = makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
+        } // Now we need to handle subqueries
+        else if (fromClause.isDerivedTable()){
+            // If we have this case, then we have to evaluate what's inside the select query first.
+            // We can do this by simply recursively calling our makePlan function on that sub-query.
+            fromPlan = makePlan(fromClause.getSelectClause(), null);
+        }
+
+        // We don't need to check if the table is a join table now because we would have done that
+        // using makeJoinPlan
+
+        // Now, we need to check if our from clause has been renamed. This could happen after we select from
+        // a derived table, for example.
+        if (fromClause.isRenamed())
+            fromPlan = new RenameNode(fromPlan, fromClause.getResultName());
+        fromPlan.prepare();
+        return fromPlan;
+    }
 
     /**
      * Given the top-level {@code FromClause} for a SELECT-FROM-WHERE block,
