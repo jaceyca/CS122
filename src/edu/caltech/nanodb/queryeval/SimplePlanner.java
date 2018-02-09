@@ -120,12 +120,8 @@ public class SimplePlanner extends AbstractPlannerImpl {
         return plan;
     }
 
-<<<<<<< HEAD
-    private PlanNode completeFromClause(FromClause fromClause, SelectClause selClause) throws IOException {
-=======
     public PlanNode completeFromClause(FromClause fromClause, SelectClause selClause,
                                        Aggregate processor) throws IOException {
->>>>>>> 319b818767d7d9a69bca65e6726dae55cfa9cf7c
         PlanNode fromPlan = null;
         if (fromClause.isBaseTable()) {
             // If we have this case, then our behavior is as before. Simple!
@@ -152,23 +148,12 @@ public class SimplePlanner extends AbstractPlannerImpl {
             // So, we recursively call completeFromClause to complete the set up of those from clauses.
             FromClause leftFromClause = fromClause.getLeftChild();
             FromClause rightFromClause = fromClause.getRightChild();
-<<<<<<< HEAD
-            PlanNode leftChild = completeFromClause(leftFromClause, selClause);
-            PlanNode rightChild = completeFromClause(rightFromClause, selClause);
-            if (fromClause.getConditionType() == FromClause.JoinConditionType.JOIN_ON_EXPR) {
-                fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
-                        fromClause.getJoinType(), fromClause.getOnExpression());
-            } else {
-                fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
-                        fromClause.getJoinType(), fromClause.getComputedJoinExpr());
-            }
-=======
+
             PlanNode leftChild = completeFromClause(leftFromClause, selClause, processor);
             PlanNode rightChild = completeFromClause(rightFromClause, selClause, processor);
 //            System.out.println("completeFromClause.newNestedLoopJoinNode");
             fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
                     fromClause.getJoinType(), fromClause.getOnExpression());
->>>>>>> 319b818767d7d9a69bca65e6726dae55cfa9cf7c
         }
 
         // Now, we need to check if our from clause has been renamed. This could happen after we select from
