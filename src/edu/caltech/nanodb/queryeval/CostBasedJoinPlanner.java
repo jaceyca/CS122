@@ -205,6 +205,9 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
                 throw new IllegalArgumentException("WHERE clauses cannot have aggregates");
         }
 
+        Expression havingExpression = selClause.getHavingExpr();
+        if (havingExpression != null)
+            PredicateUtils.collectConjuncts(havingExpression, conjuncts);
 
         // At this point, we have collected all the conjuncts (except having???)
         // Would there any be any unused conjuncts from WHERE clause? Probably not.
@@ -222,6 +225,9 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             // point, we know we have a FROM clause, so we don't have to check that in completeFromClause.
             plan = completeFromClause(fromClause, selClause, processor);
         }
+//        JoinComponent joinComponent = makeJoinPlan(fromClause, conjuncts);
+//        conjuncts.removeAll(joinComponent.conjunctsUsed);
+//        plan = joinComponent.joinPlan;
 
         Map<String, FunctionCall> columnReferenceMap = processor.prepareMap();
 
@@ -229,7 +235,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             plan = new HashedGroupAggregateNode(plan, groupByExpressions, columnReferenceMap);
 
         // Next, we handle HAVING expressions (if one exists) here
-        Expression havingExpression = selClause.getHavingExpr();
         if (havingExpression != null) {
             havingExpression.traverse(processor);
             selClause.setHavingExpr(havingExpression);
@@ -469,7 +474,18 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
 
     /**
      * Constructs a plan tree for evaluating the specified from-clause.
-     * TODO:  COMPLETE THE DOCUMENTATION
+     * We want to identify all "leaves" in the FROM expression. This includes
+     * base-tables, subqueries, and outer-joins. We create an optimal plan for
+     * each leaf identified, storing each optimal leaf plan, along with its cost.
+     * If we have a baseTable, then we determine that it is worth it to apply
+     * conjuncts by calling prepare(). However, in the derived tables, it
+     * would be too costly to call prepare().
+     * For the outerJoin, we recognize that if we have a right outer join, then
+     * we cannot pass on conjuncts that come from the left child
+     * because the two resulting queries would not be equivalent.
+     * Similarly, if we have a left outer join, then we cannot
+     * pass on conjuncts that come from the right child. So, before
+     * collecting conjuncts, we must check for these cases.
      *
      * @param fromClause the select nodes that need to be joined.
      *
@@ -492,8 +508,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
     private PlanNode makeLeafPlan(FromClause fromClause,
         Collection<Expression> conjuncts, HashSet<Expression> leafConjuncts)
         throws IOException {
-
-        // TODO:  IMPLEMENT.
         //        If you apply any conjuncts then make sure to add them to the
         //        leafConjuncts collection.
         //
@@ -505,30 +519,26 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
 
         PlanNode leafPlan = null;
 
-        // We want to identify all "leaves" in the FROM expression. This includes
-        // base-tables, subqueries, and outer-joins. We create an optimal plan for
-        // each leaf identified, storing each optimal leaf plan, along with its cost.
-        SelectClause selClause = fromClause.getSelectClause();
         if (fromClause.isBaseTable()) {
+            String baseTableName = fromClause.getTableName();
             // It would not be too expensive to call prepare() to get the conjuncts from a base table.
-            leafPlan = makeSimpleSelect(fromClause.getTableName(), null, null);
+            leafPlan = makeSimpleSelect(baseTableName, null, null);
             leafPlan.prepare();
             Schema baseTableSchema = leafPlan.getSchema();
-//            PredicateUtils.collectConjuncts();
+            PredicateUtils.findExprsUsingSchemas(conjuncts, false, leafConjuncts,
+                    baseTableSchema);
+            leafPlan = makeSimpleSelect(baseTableName, PredicateUtils.makePredicate(leafConjuncts),
+                    null);
         }
 
         else if (fromClause.isDerivedTable()) {
+            SelectClause selClause = fromClause.getSelectClause();
             // It is probably too expensive and not worth it to call prepare() and collect
             // these conjuncts, so we leave this case as is
             leafPlan = makePlan(selClause, null);
         }
         else if (fromClause.isOuterJoin()) {
-            // Here, we recognize that if we have a right outer join, then
-            // we cannot pass on conjuncts that come from the left child
-            // because the two resulting queries would not be equivalent.
-            // Similarly, if we have a left outer join, then we cannot
-            // pass on conjuncts that come from the right child. So, before
-            // collecting conjuncts, we must check for these cases.
+
 //            fromClause.prepare
             FromClause leftFromClause = fromClause.getLeftChild();
             FromClause rightFromClause = fromClause.getRightChild();
