@@ -18,6 +18,8 @@ import edu.caltech.nanodb.relations.TableInfo;
 import edu.caltech.nanodb.relations.JoinType;
 import sun.java2d.pipe.SpanShapeRenderer;
 
+import javax.sql.rowset.Predicate;
+
 
 /**
  * This planner implementation uses dynamic programming to devise an optimal
@@ -157,12 +159,17 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         // should not have any aggregates. We also modify the completeFromClause function
         // because we only use that if the fromClause is not a Join Expression. If it is,
         // then we just use makeJoinPlan.
+
+        // More OH notes: We need to collect conjuncts from HAVING and we don't really have
+        // to check for aggregates that we don't have to pass down because they should be
+        // renamed if we did that correctly. So, after that, there should be unused conjuncts
+        // which we will have to handle after we makeJoinPlan().
         if (enclosingSelects != null && !enclosingSelects.isEmpty()) {
             throw new UnsupportedOperationException(
                     "Not implemented:  enclosing queries");
         }
 
-        PlanNode plan = null;
+        PlanNode plan;
         FromClause fromClause = selClause.getFromClause();
 //        System.out.println("makePlan1");
 
@@ -502,10 +509,19 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         // base-tables, subqueries, and outer-joins. We create an optimal plan for
         // each leaf identified, storing each optimal leaf plan, along with its cost.
         SelectClause selClause = fromClause.getSelectClause();
-        if (fromClause.isBaseTable())
+        if (fromClause.isBaseTable()) {
+            // It would not be too expensive to call prepare() to get the conjuncts from a base table.
             leafPlan = makeSimpleSelect(fromClause.getTableName(), null, null);
-        else if (fromClause.isDerivedTable())
+            leafPlan.prepare();
+            Schema baseTableSchema = leafPlan.getSchema();
+//            PredicateUtils.collectConjuncts();
+        }
+
+        else if (fromClause.isDerivedTable()) {
+            // It is probably too expensive and not worth it to call prepare() and collect
+            // these conjuncts, so we leave this case as is
             leafPlan = makePlan(selClause, null);
+        }
         else if (fromClause.isOuterJoin()) {
             // Here, we recognize that if we have a right outer join, then
             // we cannot pass on conjuncts that come from the left child
@@ -529,8 +545,7 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
                 PredicateUtils.findExprsUsingSchemas(conjuncts, false,
                         leafConjuncts, rightSchema);
                 rightConjuncts = leafConjuncts;
-            }
-            else if (!fromClause.hasOuterJoinOnRight()) {
+            } else if (!fromClause.hasOuterJoinOnRight()) {
                 PredicateUtils.findExprsUsingSchemas(conjuncts, false,
                         leafConjuncts, leftSchema);
                 leftConjuncts = leafConjuncts;
@@ -541,6 +556,11 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
                     rightJoinComponent.joinPlan, fromClause.getJoinType(),
                     fromClause.getComputedJoinExpr());
         }
+
+        // If we need to rename node
+        if (fromClause.isRenamed())
+            leafPlan = new RenameNode(leafPlan, fromClause.getResultName());
+
         leafPlan.prepare();
 
         return leafPlan;
