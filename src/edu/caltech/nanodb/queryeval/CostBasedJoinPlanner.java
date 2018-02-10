@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.*;
 
 import edu.caltech.nanodb.expressions.*;
+import edu.caltech.nanodb.functions.AggregateFunction;
 import edu.caltech.nanodb.plannodes.*;
 import edu.caltech.nanodb.queryast.SelectValue;
 import edu.caltech.nanodb.relations.Schema;
@@ -16,9 +17,6 @@ import edu.caltech.nanodb.queryast.SelectClause;
 import edu.caltech.nanodb.relations.TableInfo;
 
 import edu.caltech.nanodb.relations.JoinType;
-import sun.java2d.pipe.SpanShapeRenderer;
-
-import javax.sql.rowset.Predicate;
 
 
 /**
@@ -171,7 +169,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
 
         PlanNode plan;
         FromClause fromClause = selClause.getFromClause();
-//        System.out.println("makePlan1");
 
         // Here, we support the situations where there is no child plan,
         // and no expression references a column name
@@ -204,10 +201,26 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             if (!processor.aggregateFunctions.isEmpty())
                 throw new IllegalArgumentException("WHERE clauses cannot have aggregates");
         }
-
+        // Here, we take care of removing only aggregate functions from the HAVING expression
+        List<Expression> aggList = new ArrayList<>();
         Expression havingExpression = selClause.getHavingExpr();
-        if (havingExpression != null)
-            PredicateUtils.collectConjuncts(havingExpression, conjuncts);
+        if (havingExpression != null) {
+            for (Expression conj : conjuncts) {
+//                assert(false);
+                for (FunctionCall aggFunc : processor.rememberFunctionCalls) {
+                    if (conj instanceof FunctionCall) {
+                        conj = (FunctionCall) conj;
+                        if (conj.equals(aggFunc)) {
+                            conjuncts.remove(conj);
+                            aggList.add((Expression) aggFunc);
+                            assert (false);
+                        }
+                    }
+//                    assert(false);
+                }
+            }
+        }
+//        assert(false);
 
         // At this point, we have collected all the conjuncts (except having???)
         // Would there any be any unused conjuncts from WHERE clause? Probably not.
@@ -217,6 +230,7 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             // Now we must remove all the conjuncts that makeJoinPlan used
             conjuncts.removeAll(joinComponent.conjunctsUsed);
             plan = joinComponent.joinPlan;
+            assert(conjuncts.isEmpty());
 //            plan = completeFromClause(fromClause, selClause, processor);
         } else {
             // We complete the FROM clause so we have something to work with. This is the birth of a miracle
@@ -224,10 +238,16 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             // will be supported as well (no full-outer joins) and subqueries in the FROM clause. Also, at this
             // point, we know we have a FROM clause, so we don't have to check that in completeFromClause.
             plan = completeFromClause(fromClause, selClause, processor);
+            if (!conjuncts.isEmpty()) {
+                plan = new SimpleFilterNode(plan, PredicateUtils.makePredicate(conjuncts));
+                conjuncts.removeAll(conjuncts); // All conjuncts should have been used
+            }
         }
 //        JoinComponent joinComponent = makeJoinPlan(fromClause, conjuncts);
 //        conjuncts.removeAll(joinComponent.conjunctsUsed);
 //        plan = joinComponent.joinPlan;
+        if (!conjuncts.isEmpty())
+            plan = new SimpleFilterNode(plan, havingExpression);
 
         Map<String, FunctionCall> columnReferenceMap = processor.prepareMap();
 
@@ -235,12 +255,16 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             plan = new HashedGroupAggregateNode(plan, groupByExpressions, columnReferenceMap);
 
         // Next, we handle HAVING expressions (if one exists) here
+        havingExpression = selClause.getHavingExpr();
         if (havingExpression != null) {
             havingExpression.traverse(processor);
             selClause.setHavingExpr(havingExpression);
             plan = new SimpleFilterNode(plan, havingExpression);
+            // Already collected conjuncts
 //            PredicateUtils.collectConjuncts(havingExpression, conjuncts);
         }
+//        if (!aggList.isEmpty())
+//            plan = new SimpleFilterNode(plan, PredicateUtils.makePredicate(aggList));
 
         // Now, we will use the rest of the conjuncts that makeJoinPlan didn't use
         // We should have used all of them, which is why the following line probably
