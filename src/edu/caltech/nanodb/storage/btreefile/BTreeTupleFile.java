@@ -481,8 +481,7 @@ public class BTreeTupleFile implements SequentialTupleFile {
         if (pagePath != null)
             pagePath.add(rootPageNo);
 
-        /* TODO:  IMPLEMENT THE REST OF THIS METHOD.
-         *
+        /*
          * Don't forget to update the page-path as you navigate the index
          * structure, if it is provided by the caller.
          *
@@ -492,9 +491,35 @@ public class BTreeTupleFile implements SequentialTupleFile {
          * It's always a good idea to code defensively:  if you see an invalid
          * page-type, flag it with an IOException, as done earlier.
          */
-        logger.error("NOT YET IMPLEMENTED:  navigateToLeafPage()");
+        int compVal; // The value given from comparePartialTuples()
+        int nextPageNo = -1; // The number of the next page
+        int keyIndex; // Index for the key in the current innerPage
+        while (dbPage.readByte(0) == BTREE_INNER_PAGE) {
+            InnerPage innerPage = new InnerPage(dbPage, schema);
+            for (keyIndex = 0; keyIndex < innerPage.getNumKeys(); keyIndex++) {
+                compVal = TupleComparator.comparePartialTuples(searchKey, innerPage.getKey(keyIndex));
+                if (compVal < 0)
+                    nextPageNo = innerPage.getPointer(keyIndex);
+            }
+            // If we have the following case, then our search key is "greater" than
+            // all the keys in the current innerPage, so we just take the last pointer
+            // Since there is one more pointer than keys, we add one to the last keyIndex
+            if (nextPageNo == -1)
+                nextPageNo = innerPage.getPointer(keyIndex + 1);
 
-        return null;
+            if (pagePath != null)
+                pagePath.add(nextPageNo);
+
+            dbPage = storageManager.loadDBPage(dbFile, nextPageNo, false);
+        }
+
+        LeafPage leafPage;
+        if (dbPage.readByte(0) == BTREE_LEAF_PAGE)
+            leafPage = new LeafPage(dbPage, schema);
+        else
+            throw new IOException("Invalid page type encountered: " + pageType);
+
+        return leafPage;
     }
 
 
