@@ -770,7 +770,6 @@ public class LeafPageOperations {
          * a parent, the tree's depth will increase by one level.
          */
 
-        // First, we want to split our leaf L
         int numKeys = leaf.getNumTuples();
         int parentPageNo = 0;
         if (pathSize > 1)
@@ -781,7 +780,6 @@ public class LeafPageOperations {
         leaf.setNextPageNo(newLeaf.getPageNo());
         // move half of the tuples from the original leaf into the new leaf
         leaf.moveTuplesRight(newLeaf, numKeys/2);
-        InnerPageOperations inOps = new InnerPageOperations(storageManager, tupleFile, fileOps);
         // get the first tuple in the new leaf
         PageTuple newKey = newLeaf.getTuple(0);
         // if this is the root
@@ -797,10 +795,11 @@ public class LeafPageOperations {
             DBFile dbFile = tupleFile.getDBFile();
             DBPage dbpHeader = storageManager.loadDBPage(dbFile, 0);
             HeaderPage.setRootPageNo(dbpHeader, parentPageNo);
+        } else {
+            InnerPage parentPage = innerPageOps.loadPage(parentPageNo);
+            pagePath.remove(pathSize - 1);
+            innerPageOps.addTuple(parentPage, pagePath, leaf.getPageNo(), newKey, newLeaf.getPageNo());
         }
-        InnerPage parentPage = inOps.loadPage(parentPageNo);
-        pagePath.remove(pathSize - 1);
-        inOps.addTuple(parentPage, pagePath, leaf.getPageNo(), newKey, newLeaf.getPageNo());
         addTupleToLeafPair(leaf, newLeaf, tuple);
 
         return null;
