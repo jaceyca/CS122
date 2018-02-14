@@ -801,11 +801,7 @@ public class LeafPageOperations {
         InnerPage parentPage = inOps.loadPage(parentPageNo);
         pagePath.remove(pathSize - 1);
         inOps.addTuple(parentPage, pagePath, leaf.getPageNo(), newKey, newLeaf.getPageNo());
-        if (TupleComparator.compareTuples(newKey, tuple) < 0) {
-            leaf.addTuple(tuple);
-        } else {
-            newLeaf.addTuple(tuple);
-        }
+        addTupleToLeafPair(leaf, newLeaf, tuple);
 
         return null;
     }
