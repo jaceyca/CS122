@@ -774,26 +774,32 @@ public class LeafPageOperations {
         int parentPageNo = 0;
         if (pathSize > 1)
             parentPageNo = pagePath.get(pathSize-2);
-//        LeafPage currPage = loadLeafPage(leaf.getPageNo());
-//        if (parentPageNo < 0) { // If this is the case then we need to create a new page
-//
-//        }
-//        else {
+        // chain our leaves together
         int rightPageNo = leaf.getNextPageNo();
         newLeaf.setNextPageNo(rightPageNo);
         leaf.setNextPageNo(newLeaf.getPageNo());
+        // move half of the tuples from the original leaf into the new leaf
         leaf.moveTuplesRight(newLeaf, numKeys/2);
-//        newLeaf.setNextPageNo(rightPageNo);
-//        leaf.setNextPageNo(newLeaf.getPageNo());
         InnerPageOperations inOps = new InnerPageOperations(storageManager, tupleFile, fileOps);
-        // we might
-        InnerPage parentPage = inOps.loadPage(parentPageNo);
-        Tuple firstTup = newLeaf.getTuple(0);
-//        int key = newLeaf.getTuple(0).getTupleIndex();
-        List<Integer> newLst = pagePath;
-        newLst.remove(pathSize-1);
-        inOps.addTuple(parentPage, newLst, leaf.getPageNo(), firstTup, newLeaf.getPageNo());
+        // get the first tuple in the new leaf
+        Tuple newKey = newLeaf.getTuple(0);
+        // if this is the root
+        if (pathSize == 1) {
+            // We need to create a new root node and set both leaves to have it as their parent
+            DBPage dbpParent = fileOps.getNewDataPage();
+            InnerPage parentPage = InnerPage.init(dbpParent, tupleFile.getSchema(),
+                    leaf.getPageNo(), newKey, newLeaf.getPageNo());
 
+            parentPageNo = parentPage.getPageNo();
+
+            // We have a new root-page in the index!
+            DBFile dbFile = tupleFile.getDBFile();
+            DBPage dbpHeader = storageManager.loadDBPage(dbFile, 0);
+            HeaderPage.setRootPageNo(dbpHeader, parentPageNo);
+        }
+        InnerPage parentPage = inOps.loadPage(parentPageNo);
+        pagePath.remove(pathSize - 1);
+        inOps.addTuple(parentPage, pagePath, leaf.getPageNo(), newKey, newLeaf.getPageNo());
         return null;
     }
 
