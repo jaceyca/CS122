@@ -768,7 +768,32 @@ public class LeafPageOperations {
          * The parent page must also be updated.  If the leaf node doesn't have
          * a parent, the tree's depth will increase by one level.
          */
-        logger.error("NOT YET IMPLEMENTED:  splitLeafAndAddKey()");
+
+        // First, we want to split our leaf L
+        int numKeys = leaf.getNumTuples();
+        int parentPageNo = 0;
+        if (pathSize > 1)
+            parentPageNo = pagePath.get(pathSize-2);
+//        LeafPage currPage = loadLeafPage(leaf.getPageNo());
+//        if (parentPageNo < 0) { // If this is the case then we need to create a new page
+//
+//        }
+//        else {
+        int rightPageNo = leaf.getNextPageNo();
+        newLeaf.setNextPageNo(rightPageNo);
+        leaf.setNextPageNo(newLeaf.getPageNo());
+        leaf.moveTuplesRight(newLeaf, numKeys/2);
+//        newLeaf.setNextPageNo(rightPageNo);
+//        leaf.setNextPageNo(newLeaf.getPageNo());
+        InnerPageOperations inOps = new InnerPageOperations(storageManager, tupleFile, fileOps);
+        // we might
+        InnerPage parentPage = inOps.loadPage(parentPageNo);
+        Tuple firstTup = newLeaf.getTuple(0);
+//        int key = newLeaf.getTuple(0).getTupleIndex();
+        List<Integer> newLst = pagePath;
+        newLst.remove(pathSize-1);
+        inOps.addTuple(parentPage, newLst, leaf.getPageNo(), firstTup, newLeaf.getPageNo());
+
         return null;
     }
 
