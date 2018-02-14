@@ -505,7 +505,7 @@ public class BTreeTupleFile implements SequentialTupleFile {
             // all the keys in the current innerPage, so we just take the last pointer
             // Since there is one more pointer than keys, we add one to the last keyIndex
             if (nextPageNo == -1)
-                nextPageNo = innerPage.getPointer(keyIndex + 1);
+                nextPageNo = innerPage.getPointer(innerPage.getNumKeys());
 
             if (pagePath != null)
                 pagePath.add(nextPageNo);

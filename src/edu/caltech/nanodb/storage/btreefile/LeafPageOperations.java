@@ -781,7 +781,7 @@ public class LeafPageOperations {
         // move half of the tuples from the original leaf into the new leaf
         leaf.moveTuplesRight(newLeaf, numKeys/2);
         // get the first tuple in the new leaf
-        PageTuple newKey = newLeaf.getTuple(0);
+        BTreeFilePageTuple newKey = newLeaf.getTuple(0);
         // if this is the root
         if (pathSize == 1) {
             // We need to create a new root node and set both leaves to have it as their parent
@@ -800,9 +800,9 @@ public class LeafPageOperations {
             pagePath.remove(pathSize - 1);
             innerPageOps.addTuple(parentPage, pagePath, leaf.getPageNo(), newKey, newLeaf.getPageNo());
         }
-        addTupleToLeafPair(leaf, newLeaf, tuple);
+        BTreeFilePageTuple result = addTupleToLeafPair(leaf, newLeaf, tuple);
 
-        return null;
+        return result;
     }
 
 
