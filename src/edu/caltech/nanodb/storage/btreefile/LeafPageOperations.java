@@ -4,6 +4,7 @@ package edu.caltech.nanodb.storage.btreefile;
 import java.io.IOException;
 import java.util.List;
 
+import edu.caltech.nanodb.storage.PageTuple;
 import org.apache.log4j.Logger;
 
 import edu.caltech.nanodb.expressions.TupleComparator;
@@ -782,7 +783,7 @@ public class LeafPageOperations {
         leaf.moveTuplesRight(newLeaf, numKeys/2);
         InnerPageOperations inOps = new InnerPageOperations(storageManager, tupleFile, fileOps);
         // get the first tuple in the new leaf
-        Tuple newKey = newLeaf.getTuple(0);
+        PageTuple newKey = newLeaf.getTuple(0);
         // if this is the root
         if (pathSize == 1) {
             // We need to create a new root node and set both leaves to have it as their parent
@@ -800,6 +801,12 @@ public class LeafPageOperations {
         InnerPage parentPage = inOps.loadPage(parentPageNo);
         pagePath.remove(pathSize - 1);
         inOps.addTuple(parentPage, pagePath, leaf.getPageNo(), newKey, newLeaf.getPageNo());
+        if (TupleComparator.compareTuples(newKey, tuple) < 0) {
+            leaf.addTuple(tuple);
+        } else {
+            newLeaf.addTuple(tuple);
+        }
+
         return null;
     }
 
