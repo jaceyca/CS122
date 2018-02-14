@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.log4j.Logger;
 
@@ -136,6 +137,14 @@ public class IndexedTableManager implements TableManager {
         manager.saveMetadata(tupleFile);
     }
 
+    // Inherit interface docs.
+    @Override
+    public void saveAllTableInfos() throws IOException {
+        for (TableInfo tableInfo : openTables.values()) {
+            saveTableInfo(tableInfo);
+        }
+    }
+
 
     // Inherit interface docs.
     @Override
@@ -184,6 +193,13 @@ public class IndexedTableManager implements TableManager {
         storageManager.getFileManager().closeDBFile(dbFile);
     }
 
+    // Inherit interface docs.
+    @Override
+    public void closeAllTables() throws IOException {
+        for (TableInfo tableInfo : new CopyOnWriteArrayList<>(openTables.values())) {
+            closeTable(tableInfo);
+        }
+    }
 
     // Inherit interface docs.
     @Override
