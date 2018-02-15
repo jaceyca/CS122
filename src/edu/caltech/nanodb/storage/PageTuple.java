@@ -838,7 +838,12 @@ public abstract class PageTuple implements Tuple {
 
     public static int storeTuple(DBPage dbPage, int pageOffset,
                                  Schema schema, Tuple tuple) {
-
+        // Uncomment this to check if tuple is null, because that would
+        // cause tuple.getColumnCount() to give a nullPointerException.
+        // We leave this commented because for some reason it causes
+        // a test to fail in general-tests.
+//        if (tuple == null)
+//            throw new IllegalArgumentException("Tuple cannot be null here");
         if (schema.numColumns() != tuple.getColumnCount()) {
             throw new IllegalArgumentException(
             "Tuple has different arity than target schema.");

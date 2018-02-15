@@ -783,6 +783,7 @@ public class LeafPageOperations {
         // get the first tuple in the new leaf
         BTreeFilePageTuple newKey = newLeaf.getTuple(0);
         // if this is the root
+        BTreeFilePageTuple result;
         if (pathSize == 1) {
             // We need to create a new root node and set both leaves to have it as their parent
             DBPage dbpParent = fileOps.getNewDataPage();
@@ -795,12 +796,15 @@ public class LeafPageOperations {
             DBFile dbFile = tupleFile.getDBFile();
             DBPage dbpHeader = storageManager.loadDBPage(dbFile, 0);
             HeaderPage.setRootPageNo(dbpHeader, parentPageNo);
+            result = addTupleToLeafPair(leaf, newLeaf, tuple);
         } else {
             InnerPage parentPage = innerPageOps.loadPage(parentPageNo);
             pagePath.remove(pathSize - 1);
+            result = addTupleToLeafPair(leaf, newLeaf, tuple);
+            if (parentPage == null || pagePath == null || newKey == null)
+                pagePath.remove(pagePath.size()+9999); // We want to throw error here
             innerPageOps.addTuple(parentPage, pagePath, leaf.getPageNo(), newKey, newLeaf.getPageNo());
         }
-        BTreeFilePageTuple result = addTupleToLeafPair(leaf, newLeaf, tuple);
 
         return result;
     }

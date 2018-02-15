@@ -498,8 +498,10 @@ public class BTreeTupleFile implements SequentialTupleFile {
             InnerPage innerPage = new InnerPage(dbPage, schema);
             for (keyIndex = 0; keyIndex < innerPage.getNumKeys(); keyIndex++) {
                 compVal = TupleComparator.comparePartialTuples(searchKey, innerPage.getKey(keyIndex));
-                if (compVal < 0)
+                if (compVal < 0) {
                     nextPageNo = innerPage.getPointer(keyIndex);
+                    break; // We must break so we don't keep updating
+                }
             }
             // If we have the following case, then our search key is "greater" than
             // all the keys in the current innerPage, so we just take the last pointer
