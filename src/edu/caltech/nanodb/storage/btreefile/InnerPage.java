@@ -730,7 +730,7 @@ public class InnerPage implements DataPage {
 
         //this will be the new parent key
         DBPage lpage = leftSibling.getDBPage();
-        BTreeFilePageTuple newKey = getKey(count - 1);
+        BTreeFilePageTuple newKey = getKey(count);
         byte[] data = dbPage.getPageData();
 
         //how much data needs to be moved
@@ -752,7 +752,7 @@ public class InnerPage implements DataPage {
         loadPageContents();
         leftSibling.loadPageContents();
 
-        return null;
+        return new TupleLiteral(newKey);
     }
 
 
@@ -963,6 +963,7 @@ public class InnerPage implements DataPage {
         }
 
         //how much data needs to be moved
+        BTreeFilePageTuple newKey = getKey(count);
         byte[] data = dbPage.getPageData();
         rpage.write(OFFSET_FIRST_POINTER,
         			data, startOffset, len);
@@ -985,7 +986,7 @@ public class InnerPage implements DataPage {
                 rightSibling.toFormattedString());
         }
 
-        return null;
+        return new TupleLiteral(newKey);
     }
 
 
