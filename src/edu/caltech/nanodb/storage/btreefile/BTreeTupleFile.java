@@ -443,12 +443,10 @@ public class BTreeTupleFile implements SequentialTupleFile {
         if (rootPageNo == 0) {
             // The file doesn't have any data-pages at all yet.  Create one if
             // the caller wants it.
-
             if (!createIfNeeded)
                 return null;
 
             // We need to create a brand new leaf page and make it the root.
-
             logger.debug("BTree file currently has no data pages; " +
                          "finding/creating one to use as the root!");
 

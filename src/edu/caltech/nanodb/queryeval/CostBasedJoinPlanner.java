@@ -216,11 +216,9 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
                             assert (false);
                         }
                     }
-//                    assert(false);
                 }
             }
         }
-//        assert(false);
 
         // At this point, we have collected all the conjuncts (except having???)
         // Would there any be any unused conjuncts from WHERE clause? Probably not.
@@ -231,7 +229,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             conjuncts.removeAll(joinComponent.conjunctsUsed);
             plan = joinComponent.joinPlan;
             assert(conjuncts.isEmpty());
-//            plan = completeFromClause(fromClause, selClause, processor);
         } else {
             // We complete the FROM clause so we have something to work with. This is the birth of a miracle
             // This will support basic joins (not NATURAL joins or joins with USING). Left and right outer joins
@@ -243,9 +240,7 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
                 conjuncts.removeAll(conjuncts); // All conjuncts should have been used
             }
         }
-//        JoinComponent joinComponent = makeJoinPlan(fromClause, conjuncts);
-//        conjuncts.removeAll(joinComponent.conjunctsUsed);
-//        plan = joinComponent.joinPlan;
+
         if (!conjuncts.isEmpty())
             plan = new SimpleFilterNode(plan, havingExpression);
 
@@ -261,19 +256,14 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             selClause.setHavingExpr(havingExpression);
             plan = new SimpleFilterNode(plan, havingExpression);
             // Already collected conjuncts
-//            PredicateUtils.collectConjuncts(havingExpression, conjuncts);
         }
-//        if (!aggList.isEmpty())
-//            plan = new SimpleFilterNode(plan, PredicateUtils.makePredicate(aggList));
 
         // Now, we will use the rest of the conjuncts that makeJoinPlan didn't use
         // We should have used all of them, which is why the following line probably
         // makes everything fail?? There are still some conjuncts left over
         // from only collecting from WHERE clause. I don't think this makes sense.
-//        if (!conjuncts.isEmpty())
-//            plan = new SimpleFilterNode(plan, PredicateUtils.makePredicate(conjuncts));
 
-                // Here, we support the situations where there is a child plan, and we
+        // Here, we support the situations where there is a child plan, and we
         // have to project the select values specified by the select clause.
         plan = new ProjectNode(plan, selectValues);
 
@@ -300,10 +290,8 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         else if (fromClause.isJoinExpr()) { // This should never get used
             // If we have an ON clause, then we need to use our Aggregate class to check
             // if that ON clause has an aggregate. It should not have one.
-//            System.out.println("completeFromClause.isJoin");
             Expression onExpression = fromClause.getOnExpression();
             if (onExpression != null) {
-//                System.out.println("completeFromClause.hasOnExpression");
                 onExpression.traverse(processor);
                 if (!processor.aggregateFunctions.isEmpty())
                     throw new IllegalArgumentException("ON clauses cannot have aggregates");
@@ -315,7 +303,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
             FromClause rightFromClause = fromClause.getRightChild();
             PlanNode leftChild = completeFromClause(leftFromClause, selClause, processor);
             PlanNode rightChild = completeFromClause(rightFromClause, selClause, processor);
-//            System.out.println("completeFromClause.newNestedLoopJoinNode");
             fromPlan = new NestedLoopJoinNode(leftChild, rightChild,
                     fromClause.getJoinType(), fromClause.getOnExpression());
         }
@@ -327,29 +314,6 @@ public class CostBasedJoinPlanner extends AbstractPlannerImpl {
         fromPlan.prepare();
         return fromPlan;
     }
-//    public PlanNode completeFromClause(FromClause fromClause, SelectClause selClause,
-//                                       Aggregate processor) throws IOException {
-//        PlanNode fromPlan = null;
-//        if (fromClause.isBaseTable()) {
-//            // If we have this case, then our behavior is as before. Simple!
-//            fromPlan = makeSimpleSelect(fromClause.getTableName(), selClause.getWhereExpr(), null);
-//        } // Now we need to handle subqueries
-//        else if (fromClause.isDerivedTable()){
-//            // If we have this case, then we have to evaluate what's inside the select query first.
-//            // We can do this by simply recursively calling our makePlan function on that sub-query.
-//            fromPlan = makePlan(fromClause.getSelectClause(), null);
-//        }
-//
-//        // We don't need to check if the table is a join table now because we would have done that
-//        // using makeJoinPlan
-//
-//        // Now, we need to check if our from clause has been renamed. This could happen after we select from
-//        // a derived table, for example.
-//        if (fromClause.isRenamed())
-//            fromPlan = new RenameNode(fromPlan, fromClause.getResultName());
-//        fromPlan.prepare();
-//        return fromPlan;
-//    }
 
     /**
      * Given the top-level {@code FromClause} for a SELECT-FROM-WHERE block,
