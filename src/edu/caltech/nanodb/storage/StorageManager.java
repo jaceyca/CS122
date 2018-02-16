@@ -300,8 +300,6 @@ public class StorageManager {
                 "Storage manager is not initialized.");
         }
 
-        tableManager.saveAllTableInfos();
-        tableManager.closeAllTables();
         if (transactionManager != null)
             transactionManager.forceWAL();
 

@@ -83,7 +83,7 @@ public interface TableManager {
      *         occurs while storing the initial table data.
      */
     void saveTableInfo(TableInfo tableInfo) throws IOException;
-    void saveAllTableInfos() throws IOException;
+
 
     /**
      * This function analyzes the specified table, and updates the table's
@@ -108,7 +108,7 @@ public interface TableManager {
      *         flushed to disk and a write error occurs.
      */
     void closeTable(TableInfo tableInfo) throws IOException;
-    void closeAllTables() throws IOException;
+
 
     /**
      * Drops the specified table from the database.

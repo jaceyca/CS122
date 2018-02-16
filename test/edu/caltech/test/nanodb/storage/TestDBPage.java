@@ -75,7 +75,6 @@ public class TestDBPage extends StorageTestCase {
 	 */
 	@AfterClass
 	public void afterClass() throws IOException {
-		fileMgr.closeDBFile(dbFile);
 		fileMgr.deleteDBFile(dbFile);
 	}
 
