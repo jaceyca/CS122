@@ -706,7 +706,7 @@ public class InnerPage implements DataPage {
 
         if (count < 0 || count > numPointers) {
             throw new IllegalArgumentException("count must be in range (0, " +
-                numPointers + "), got " + count);
+                    numPointers + "), got " + count);
         }
 
         // The parent-key can be null if we are splitting a page into two pages.
@@ -718,41 +718,41 @@ public class InnerPage implements DataPage {
         else {
             if (leftSibling.getNumPointers() != 0) {
                 throw new IllegalStateException("Cannot move pointers to " +
-                    "non-empty sibling if no parent-key is specified!");
+                        "non-empty sibling if no parent-key is specified!");
             }
         }
-
-        if(parentKeyLen != 0)
+        TupleLiteral key = new TupleLiteral(getKey(count - 1));
+        if(parentKey != null)
         { //moving the parent tuple
-        	PageTuple.storeTuple(leftSibling.getDBPage(),
-        		leftSibling.endOffset, schema, parentKey);
+            PageTuple.storeTuple(leftSibling.getDBPage(),
+                    leftSibling.endOffset, leftSibling.schema, parentKey);
         }
 
         //this will be the new parent key
         DBPage lpage = leftSibling.getDBPage();
-        BTreeFilePageTuple newKey = getKey(count);
-        byte[] data = dbPage.getPageData();
+        BTreeFilePageTuple newKey = getKey(count - 1);
 
         //how much data needs to be moved
         lpage.write(leftSibling.endOffset + parentKeyLen,
-        			data, OFFSET_FIRST_POINTER,
-        			newKey.getOffset() - OFFSET_FIRST_POINTER);
+                dbPage.getPageData(), OFFSET_FIRST_POINTER,
+                newKey.getOffset() - OFFSET_FIRST_POINTER);
+
+        lpage.writeShort(OFFSET_NUM_POINTERS,
+                leftSibling.getNumPointers() + count);
 
         //moving over the rest of the data in source node to the left
-        dbPage.moveDataRange(newKey.getEndOffset(),
-        					 OFFSET_FIRST_POINTER,
-        					 endOffset - newKey.getEndOffset());
+        dbPage.moveDataRange(getKey(count - 1).getEndOffset(),
+                OFFSET_FIRST_POINTER,
+                endOffset - getKey(count - 1).getEndOffset());
 
         //actually updating the number of pointers
-        lpage.writeShort(OFFSET_NUM_POINTERS,
-        				 leftSibling.getNumPointers() + count);
         dbPage.writeShort(OFFSET_NUM_POINTERS, numPointers - count);
 
         // Update the cached info for both non-leaf pages.
         loadPageContents();
         leftSibling.loadPageContents();
 
-        return new TupleLiteral(newKey);
+        return key;
     }
 
 
@@ -922,12 +922,12 @@ public class InnerPage implements DataPage {
 
         if (count < 0 || count > numPointers) {
             throw new IllegalArgumentException("count must be in range [0, " +
-                numPointers + "), got " + count);
+                    numPointers + "), got " + count);
         }
 
         if (logger.isTraceEnabled()) {
             logger.trace("Non-leaf page " + getPageNo() +
-                " contents before moving pointers right:\n" + toFormattedString());
+                    " contents before moving pointers right:\n" + toFormattedString());
         }
 
         int startPointerIndex = numPointers - count;
@@ -935,8 +935,8 @@ public class InnerPage implements DataPage {
         int len = endOffset - startOffset;
 
         logger.debug("Moving everything after pointer " + startPointerIndex +
-            " to right sibling.  Start offset = " + startOffset +
-            ", end offset = " + endOffset + ", len = " + len);
+                " to right sibling.  Start offset = " + startOffset +
+                ", end offset = " + endOffset + ", len = " + len);
 
         // The parent-key can be null if we are splitting a page into two pages.
         // However, this situation is only valid if the right sibling is EMPTY.
@@ -947,30 +947,41 @@ public class InnerPage implements DataPage {
         else {
             if (rightSibling.getNumPointers() != 0) {
                 throw new IllegalStateException("Cannot move pointers to " +
-                    "non-empty sibling if no parent-key is specified!");
+                        "non-empty sibling if no parent-key is specified!");
             }
         }
-
+        TupleLiteral key = new TupleLiteral(getKey(numPointers - count - 1));
         DBPage rpage = rightSibling.getDBPage();
-        rpage.moveDataRange(OFFSET_FIRST_POINTER,
-        					OFFSET_FIRST_POINTER + len + parentKeyLen,
-        					rightSibling.getSpaceUsedByEntries());
 
-        if(parentKeyLen != 0)
+        int move = parentKeyLen;
+        int begin = getKey(numPointers - count - 1).getEndOffset();
+        move += endOffset - begin;
+
+        if(parentKey != null)
         { //moving the parent tuple
-        	PageTuple.storeTuple(rightSibling.getDBPage(),
-        		OFFSET_FIRST_POINTER + len, schema, parentKey);
+            rpage.moveDataRange(OFFSET_FIRST_POINTER,
+                    OFFSET_FIRST_POINTER  + move,
+                    rightSibling.getSpaceUsedByEntries());
+
+            PageTuple.storeTuple(rpage,
+                    OFFSET_FIRST_POINTER +
+                            move - parentKeyLen,
+                    schema, parentKey);
         }
 
         //how much data needs to be moved
-        BTreeFilePageTuple newKey = getKey(count);
-        byte[] data = dbPage.getPageData();
         rpage.write(OFFSET_FIRST_POINTER,
-        			data, startOffset, len);
+                dbPage.getPageData(),
+                begin,
+                move - parentKeyLen;
 
+        begin = getKey(numPointers - count - 1).getOffset();
+        int over = move + getKey(numPointers - count - 1).getEndOffset() - begin;
+
+        dbPage.setDataRange(begin, over - parentKeyLen, (byte) 0))
         //actually updating the number of pointers
         rpage.writeShort(OFFSET_NUM_POINTERS,
-        				 rightSibling.getNumPointers() + count);
+                rightSibling.getNumPointers() - count);
         dbPage.writeShort(OFFSET_NUM_POINTERS, numPointers - count);
 
         // Update the cached info for both non-leaf pages.
@@ -979,14 +990,14 @@ public class InnerPage implements DataPage {
 
         if (logger.isTraceEnabled()) {
             logger.trace("Non-leaf page " + getPageNo() +
-                " contents after moving pointers right:\n" + toFormattedString());
+                    " contents after moving pointers right:\n" + toFormattedString());
 
             logger.trace("Right-sibling page " + rightSibling.getPageNo() +
-                " contents after moving pointers right:\n" +
-                rightSibling.toFormattedString());
+                    " contents after moving pointers right:\n" +
+                    rightSibling.toFormattedString());
         }
 
-        return new TupleLiteral(newKey);
+        return key;
     }
 
 
