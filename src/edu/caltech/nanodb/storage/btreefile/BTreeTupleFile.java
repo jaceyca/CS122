@@ -492,9 +492,10 @@ public class BTreeTupleFile implements SequentialTupleFile {
          * page-type, flag it with an IOException, as done earlier.
          */
         int compVal; // The value given from comparePartialTuples()
-        int nextPageNo = -1; // The number of the next page
+        int nextPageNo; // The number of the next page
         int keyIndex; // Index for the key in the current innerPage
         while (dbPage.readByte(0) == BTREE_INNER_PAGE) {
+            nextPageNo = -1;
             InnerPage innerPage = new InnerPage(dbPage, schema);
             for (keyIndex = 0; keyIndex < innerPage.getNumKeys(); keyIndex++) {
                 compVal = TupleComparator.comparePartialTuples(searchKey, innerPage.getKey(keyIndex));

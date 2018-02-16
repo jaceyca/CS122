@@ -724,7 +724,7 @@ public class InnerPage implements DataPage {
 
         if(parentKeyLen != 0)
         { //moving the parent tuple
-        	PageTuple.storeTuple(leftSibling.getDBPage(), 
+        	PageTuple.storeTuple(leftSibling.getDBPage(),
         		leftSibling.endOffset, schema, parentKey);
         }
 
@@ -744,7 +744,7 @@ public class InnerPage implements DataPage {
         					 endOffset - newKey.getEndOffset());
 
         //actually updating the number of pointers
-        lpage.writeShort(OFFSET_NUM_POINTERS, 
+        lpage.writeShort(OFFSET_NUM_POINTERS,
         				 leftSibling.getNumPointers() + count);
         dbPage.writeShort(OFFSET_NUM_POINTERS, numPointers - count);
 
@@ -933,7 +933,7 @@ public class InnerPage implements DataPage {
         int startPointerIndex = numPointers - count;
         int startOffset = pointerOffsets[startPointerIndex];
         int len = endOffset - startOffset;
-        
+
         logger.debug("Moving everything after pointer " + startPointerIndex +
             " to right sibling.  Start offset = " + startOffset +
             ", end offset = " + endOffset + ", len = " + len);
@@ -958,7 +958,7 @@ public class InnerPage implements DataPage {
 
         if(parentKeyLen != 0)
         { //moving the parent tuple
-        	PageTuple.storeTuple(rightSibling.getDBPage(), 
+        	PageTuple.storeTuple(rightSibling.getDBPage(),
         		OFFSET_FIRST_POINTER + len, schema, parentKey);
         }
 
@@ -969,7 +969,7 @@ public class InnerPage implements DataPage {
         			data, startOffset, len);
 
         //actually updating the number of pointers
-        rpage.writeShort(OFFSET_NUM_POINTERS, 
+        rpage.writeShort(OFFSET_NUM_POINTERS,
         				 rightSibling.getNumPointers() + count);
         dbPage.writeShort(OFFSET_NUM_POINTERS, numPointers - count);
 
