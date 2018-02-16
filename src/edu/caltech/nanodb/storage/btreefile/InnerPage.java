@@ -950,6 +950,8 @@ public class InnerPage implements DataPage {
                         "non-empty sibling if no parent-key is specified!");
             }
         }
+
+        // New code below
         TupleLiteral key = new TupleLiteral(getKey(numPointers - count - 1));
         DBPage rpage = rightSibling.getDBPage();
 
@@ -964,24 +966,20 @@ public class InnerPage implements DataPage {
                     rightSibling.getSpaceUsedByEntries());
 
             PageTuple.storeTuple(rpage,
-                    OFFSET_FIRST_POINTER +
-                            move - parentKeyLen,
+                    OFFSET_FIRST_POINTER +move - parentKeyLen,
                     schema, parentKey);
         }
 
         //how much data needs to be moved
-        rpage.write(OFFSET_FIRST_POINTER,
-                dbPage.getPageData(),
-                begin,
-                move - parentKeyLen;
+        rpage.write(OFFSET_FIRST_POINTER, dbPage.getPageData(), begin,move - parentKeyLen);
 
         begin = getKey(numPointers - count - 1).getOffset();
         int over = move + getKey(numPointers - count - 1).getEndOffset() - begin;
 
-        dbPage.setDataRange(begin, over - parentKeyLen, (byte) 0))
+        dbPage.setDataRange(begin, over - parentKeyLen, (byte) 0);
         //actually updating the number of pointers
         rpage.writeShort(OFFSET_NUM_POINTERS,
-                rightSibling.getNumPointers() - count);
+                rightSibling.getNumPointers() + count);
         dbPage.writeShort(OFFSET_NUM_POINTERS, numPointers - count);
 
         // Update the cached info for both non-leaf pages.

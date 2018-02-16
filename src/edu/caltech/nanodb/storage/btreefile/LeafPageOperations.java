@@ -800,8 +800,6 @@ public class LeafPageOperations {
             InnerPage parentPage = innerPageOps.loadPage(parentPageNo);
             pagePath.remove(pathSize - 1);
             result = addTupleToLeafPair(leaf, newLeaf, tuple);
-            if (parentPage == null || pagePath == null || newKey == null)
-                pagePath.remove(pagePath.size()+9999); // We want to throw error here
             innerPageOps.addTuple(parentPage, pagePath, leaf.getPageNo(), newKey, newLeaf.getPageNo());
         }
 
