@@ -374,6 +374,8 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
 
         DataPage.sanityCheck(dbPage);
 
+        storageManager.logDBPageWrite(dbPage);
+
         return pageTup;
     }
 
@@ -406,6 +408,8 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
 
         DBPage dbPage = ptup.getDBPage();
         DataPage.sanityCheck(dbPage);
+
+        storageManager.logDBPageWrite(dbPage);
     }
 
 
@@ -427,6 +431,7 @@ page_scan:  // So we can break out of the outer loop from inside the inner loop.
         // so that the tuple can still be unpinned, etc.
 
         DataPage.sanityCheck(dbPage);
+        storageManager.logDBPageWrite(dbPage);
     }
 
 
