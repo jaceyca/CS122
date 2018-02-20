@@ -440,6 +440,20 @@ public class TransactionManager implements BufferManagerObserver {
      * log sequence number, syncing the log to ensure that all essential
      * records have reached the disk itself.
      *
+     * This function is atomic because it follows the rule that either all
+     * operations in the transaction are reflected in the DB, or none of
+     * them are. This is because this function, before writing anything
+     * to the disk using storeTxnStateToFile(), every page from
+     * txnStateNextLSN to lsn are taken care of. Since all of these changes
+     * are reflected in only one line of code, then it makes sense that
+     * either all or none of the transactions will be reflected in the
+     * txnstate.dat file on the disk.
+     * This function is also durable because once this function completes
+     * successfully, it will have called storeTxnStateToFile(), which stores
+     * the information about the transaction on the disk. Since storage on the
+     * disk is nonvolatile, the data written in txnstate.dat will survive loss of
+     * power, disk crashes, or system crashes.
+     *
      * @param lsn All WAL data up to this value must be forced to disk and
      *        sync'd.  This value may be one past the end of the current WAL
      *        file during normal operation.
@@ -449,14 +463,63 @@ public class TransactionManager implements BufferManagerObserver {
      *         going to be broken.
      */
     public void forceWAL(LogSequenceNumber lsn) throws IOException {
-        // TODO:  IMPLEMENT
-        //
-        // Note that the "next LSN" value must be determined from both the
+        // If the lsn that was passed in comes before or is equal to txStateNextLSN,
+        // then we do not need to complete this force operation. In this case,
+        // we have a no-op, and we just return.
+        if (lsn.compareTo(txnStateNextLSN) <= 0)
+            return;
+
+        BufferManager bufferManager = storageManager.getBufferManager();
+        DBFile currDBFile;
+        int oldLsnFileNo = txnStateNextLSN.getLogFileNo();
+        int oldLsnFileOffset = txnStateNextLSN.getFileOffset();
+        int lsnFileNo = lsn.getLogFileNo();
+        int lsnFileOffset = lsn.getFileOffset();
+        int lsnRecordSize = lsn.getRecordSize();
+        int currPageSize;
+        // NanoDB always syncs files when it closes them, so syncing should
+        // only be required if a file is currently open. We can use
+        // bufferManager.getFile(string) which will return null if the file
+        // isn't open and something else otherwise. Additionally, we note that
+        // whenever currDBFile is not the file which lsn or txnStateNextLSN is on,
+        // we must write every page in each of those files. However, if
+        // currDBFile is the file that txnStateNextLSN is on, then we do not
+        // need to write any of the pages before the page that txtStateNextLSN
+        // is on. Similarly, if currDBFile is the file that lsn is on, then we
+        // must only write the pages up to the page specified in lsn. The logic
+        // below takes care of these observations.
+        if (oldLsnFileNo == lsnFileNo) {
+            currDBFile = bufferManager.getFile(WALManager.getWALFileName(oldLsnFileNo));
+            if (currDBFile != null) {
+                currPageSize = currDBFile.getPageSize();
+                bufferManager.writeDBFile(currDBFile, oldLsnFileNo/currPageSize,
+                        (lsnFileOffset + lsnRecordSize)/currPageSize, true);
+            }
+        }
+        else {
+            for (int currLsnNo = oldLsnFileNo; currLsnNo <= lsnFileNo; currLsnNo += 1) {
+                currDBFile = bufferManager.getFile(WALManager.getWALFileName(currLsnNo));
+                if (currDBFile != null) {
+                    currPageSize = currDBFile.getPageSize();
+                    if (currLsnNo == oldLsnFileNo)
+                        bufferManager.writeDBFile(currDBFile, oldLsnFileOffset/currPageSize,
+                                Integer.MAX_VALUE, true);
+                    else if (currLsnNo == lsnFileNo)
+                        bufferManager.writeDBFile(currDBFile, 0,
+                                (lsnFileOffset + lsnRecordSize)/currPageSize, true);
+                    else
+                        bufferManager.writeDBFile(currDBFile, true);
+                }
+            }
+        }
+
+        // The "next LSN" value must be determined from both the
         // current LSN *and* its record size; otherwise we lose the last log
-        // record in the WAL file.  You can use this static method:
-        //
-        // int lastPosition = lsn.getFileOffset() + lsn.getRecordSize();
-        // WALManager.computeNextLSN(lsn.getLogFileNo(), lastPosition);
+        // record in the WAL file. Here, we are writing and syncing the
+        // txnstate.dat file to the disk.
+        int lastPosition = lsn.getFileOffset() + lsn.getRecordSize();
+        txnStateNextLSN = WALManager.computeNextLSN(lsnFileNo, lastPosition);
+        storeTxnStateToFile();
     }
 
 
