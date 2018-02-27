@@ -432,6 +432,19 @@ public class TransactionManager implements BufferManagerObserver {
         //
         // Finally, you can use the forceWAL(LogSequenceNumber) function to
         // force the WAL to be written out to the specified LSN.
+
+        for (DBPage page : pages) {
+            if (page.getDBFile().getType() != DBFileType.WRITE_AHEAD_LOG_FILE &&
+                    page.getDBFile().getType() != DBFileType.TXNSTATE_FILE) {
+                LogSequenceNumber currLSN = page.getPageLSN();
+                if (currLSN == null) {
+                    throw new IOException("Expected nonnull LSN");
+                }
+                else {
+                    forceWAL(currLSN);
+                }
+            }
+        }
     }
 
 
