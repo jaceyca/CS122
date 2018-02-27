@@ -409,12 +409,10 @@ public class TransactionManager implements BufferManagerObserver {
      */
     @Override
     public void beforeWriteDirtyPages(List<DBPage> pages) throws IOException {
-        // TODO:  IMPLEMENT
-        //
-        // This implementation must enforce the write-ahead logging rule (aka
+        // This implementation enforces the write-ahead logging rule (aka
         // the WAL rule) by ensuring that the write-ahead log reflects all
         // changes to all of the specified pages, on disk, before any of these
-        // pages may be written to disk.
+        // pages are written to disk.
         //
         // Recall that DBPages have a pageLSN field that is set to the LSN
         // of the last WAL record describing a change to the page.  This value
@@ -425,26 +423,29 @@ public class TransactionManager implements BufferManagerObserver {
         // it ought to.)
         //
         // Some file types are not recorded to the write-ahead log; these
-        // pages should be ignored when determining how to update the WAL.
-        // You can find a page's file-type by doing something like this:
+        // pages are ignored when determining how to update the WAL.
+        // A page's file-type is found by doing something like this:
         // dbPage.getDBFile().getType().  If it is WRITE_AHEAD_LOG_FILE or
-        // TXNSTATE_FILE then you should ignore the page.
+        // TXNSTATE_FILE then the page is ignored.
         //
-        // Finally, you can use the forceWAL(LogSequenceNumber) function to
+        // Finally, the forceWAL(LogSequenceNumber) function is used to
         // force the WAL to be written out to the specified LSN.
 
+        LogSequenceNumber lsn = null;
         for (DBPage page : pages) {
             if (page.getDBFile().getType() != DBFileType.WRITE_AHEAD_LOG_FILE &&
                     page.getDBFile().getType() != DBFileType.TXNSTATE_FILE) {
                 LogSequenceNumber currLSN = page.getPageLSN();
-                if (currLSN == null) {
+
+                if (currLSN == null)
                     throw new IOException("Expected nonnull LSN");
-                }
-                else {
-                    forceWAL(currLSN);
-                }
+
+                else if (lsn == null || lsn.compareTo(currLSN) <= 0)
+                    lsn = currLSN;
             }
         }
+
+        forceWAL(lsn);
     }
 
 
