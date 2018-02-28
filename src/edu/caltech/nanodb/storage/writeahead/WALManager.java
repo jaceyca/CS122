@@ -1081,19 +1081,40 @@ public class WALManager {
                 "Undoing WAL record at %s.  Type = %s, TxnID = %d",
                 lsn, type, transactionID));
 
-            // TODO:  IMPLEMENT THE REST
-            //
-            //        Use logging statements liberally to help verify and
-            //        debug your work.
-            //
-            //        If you encounter invalid WAL contents, throw a
-            //        WALFileException to indicate the problem immediately.
-            //
-            // TODO:  SET lsn TO PREVIOUS LSN TO WALK BACKWARD THROUGH WAL.
+            // If we have reached the start of the transaction, we are done.
+            if (type == WALRecordType.START_TXN) {
+                break;
+            }
 
-            // TODO:  This break is just here so the code will compile; when
-            //        you provide your own implementation, get rid of it!
-            break;
+            // Each log record is identified using a LSN, which consists of the WAL file number (int),
+            // and the offset from the start of the file (int).
+            // Get the WAL file number, which is a number between 0 and 65535
+            int logFileNo = walReader.readUnsignedShort();
+            // Get offset within the file
+            int offset = walReader.readInt();
+            // Set lsn to previous lsn to walk backward through WAL
+            lsn = new LogSequenceNumber(logFileNo, offset);
+
+            // We want to undo the change and then write a redo-only log
+            if (type == WALRecordType.UPDATE_PAGE) {
+                // Get the file that was modified by this WAL record
+                String filename = walReader.readVarString255();
+                // Get the page number that was modified
+                int dbPageNo = walReader.readUnsignedShort();
+                // Load the page using the storage manager
+                DBFile dbFile = storageManager.openDBFile(filename);
+                DBPage dbPage = storageManager.loadDBPage(dbFile, dbPageNo);
+                int numSegments = walReader.readUnsignedShort();
+
+                // Undo the changes on the page and generate the redo-only data simultaneously.
+                // Note that walReader has to be positioned at the start of the redo/undo data
+                // and this method will advance the reader's position past this redo/undo data.
+                byte[] changes = applyUndoAndGenRedoOnlyData(walReader, dbPage, numSegments);
+                writeRedoOnlyUpdatePageRecord(dbPage, numSegments, changes);
+            }
+            else {
+                throw new WALFileException("Write ahead log is corrupt");
+            }
         }
 
         // All done rolling back the transaction!  Record that it was aborted

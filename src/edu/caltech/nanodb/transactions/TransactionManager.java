@@ -444,8 +444,9 @@ public class TransactionManager implements BufferManagerObserver {
                     lsn = currLSN;
             }
         }
-
-        forceWAL(lsn);
+        if (lsn != null) {
+            forceWAL(lsn);
+        }
     }
 
 
