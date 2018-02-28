@@ -258,30 +258,44 @@ public class WALManager {
                 "Redo:  examining WAL record at %s.  Type = %s, TxnID = %d",
                 currLSN, type, transactionID));
 
-            // TODO:  IMPLEMENT THE REST
-            //
-            //        Use logging statements liberally to help verify and
-            //        debug your work.
-            //
-            //        If you encounter invalid WAL contents, throw a
-            //        WALFileException to indicate the problem immediately.
-            //
-            //        You can use Java enums in a switch statement, like this:
-            //
-            //            switch (type) {
-            //            case START_TXN:
-            //                ...
-            //
-            //            case COMMIT_TXN:
-            //                ...
-            //
-            //            default:
-            //                throw new WALFileException(
-            //                    "Encountered unrecognized WAL record type " +
-            //                    type + " at LSN " + currLSN +
-            //                    " during redo processing!");
-            //            }
+            // skip over the 6 bytes of PrevLSN since it's unnecessary
+            walReader.movePosition(6);
 
+            recoveryInfo.updateInfo(transactionID, currLSN);
+
+            switch (type) {
+                case START_TXN:
+                    // Length of a start-transaction record is 6, and we have moved 11 already, so we
+                    // need to correct by moving backwards 5 bytes
+                    walReader.movePosition(-5);
+                    break;
+                // COMMIT and ABORT have the same record format, so we can combine the cases
+                case COMMIT_TXN:
+                case ABORT_TXN:
+                    recoveryInfo.recordTxnCompleted(transactionID);
+                    walReader.movePosition(1);
+                    break;
+                // UPDATE_PAGE and UPDATE_PAGE_REDO_ONLY have the same record format, so we can combine cases
+                case UPDATE_PAGE:
+                case UPDATE_PAGE_REDO_ONLY:
+                    // Get the file that was modified by this WAL record (1-256 bytes)
+                    String filename = walReader.readVarString255();
+                    // Get the page number that was modified (2 bytes)
+                    int dbPageNo = walReader.readUnsignedShort();
+                    // Load the page using the storage manager
+                    DBFile dbFile = storageManager.openDBFile(filename);
+                    DBPage dbPage = storageManager.loadDBPage(dbFile, dbPageNo);
+                    int numSegments = walReader.readUnsignedShort();
+                    // Redo the changes
+                    applyRedo(type, walReader, dbPage, numSegments);
+                    // skip over the last 5 bytes
+                    walReader.movePosition(5);
+                    break;
+                default:
+                    throw new WALFileException(
+                            "Encountered unrecognized WAL record type " + type + " at LSN " + currLSN +
+                                    " during redo processing!");
+            }
             oldLSN = currLSN;
             currLSN = computeNextLSN(currLSN.getLogFileNo(), walReader.getPosition());
         }
@@ -1086,8 +1100,8 @@ public class WALManager {
                 break;
             }
 
-            // Each log record is identified using a LSN, which consists of the WAL file number (int),
-            // and the offset from the start of the file (int).
+            // Each log record is identified using a LSN, which consists of the WAL file number (2 bytes),
+            // and the offset from the start of the file (4 bytes).
             // Get the WAL file number, which is a number between 0 and 65535
             int logFileNo = walReader.readUnsignedShort();
             // Get offset within the file
@@ -1097,9 +1111,9 @@ public class WALManager {
 
             // We want to undo the change and then write a redo-only log
             if (type == WALRecordType.UPDATE_PAGE) {
-                // Get the file that was modified by this WAL record
+                // Get the file that was modified by this WAL record (1-256 bytes)
                 String filename = walReader.readVarString255();
-                // Get the page number that was modified
+                // Get the page number that was modified (2 bytes)
                 int dbPageNo = walReader.readUnsignedShort();
                 // Load the page using the storage manager
                 DBFile dbFile = storageManager.openDBFile(filename);
