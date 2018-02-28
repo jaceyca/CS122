@@ -9,6 +9,6 @@ set CPATH=%CPATH%;build\classes
 
 rem To set the page-size to use, add "-Dnanodb.pagesize=2048" to JAVA_OPTS.
 rem To enable transaction processing, add "-Dnanodb.txns=on" to JAVA_OPTS.
-set JAVA_OPTS=-Dlog4j.configuration=logging.conf
+set JAVA_OPTS=-Dlog4j.configuration=logging.conf -Dnanodb.txns=on
 
 java %JAVA_OPTS% -cp %CPATH% edu.caltech.nanodb.client.ExclusiveClient
