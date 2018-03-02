@@ -438,7 +438,7 @@ public class TransactionManager implements BufferManagerObserver {
                 LogSequenceNumber currLSN = page.getPageLSN();
 
                 if (currLSN == null)
-                    throw new IOException("Expected nonnull LSN");
+                    logger.debug("Current LSN is null.");
 
                 else if (lsn == null || lsn.compareTo(currLSN) <= 0)
                     lsn = currLSN;
