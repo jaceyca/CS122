@@ -260,7 +260,7 @@ public class WALManager {
 
             // skip over the 6 bytes of PrevLSN since it's unnecessary
             walReader.movePosition(6);
-
+            // add to incomplete transactions set
             recoveryInfo.updateInfo(transactionID, currLSN);
 
             switch (type) {
@@ -464,7 +464,8 @@ public class WALManager {
             switch (type) {
                 case START_TXN:
                     // We want to record that the transaction is aborted
-                    writeTxnRecord(WALRecordType.ABORT_TXN, transactionID, currLSN);
+                    LogSequenceNumber prevLSN = recoveryInfo.getLastLSN(transactionID);
+                    writeTxnRecord(WALRecordType.ABORT_TXN, transactionID, prevLSN);
                     recoveryInfo.recordTxnCompleted(transactionID);
                     break;
                 // We shouldn't see commits or rollbacks for incomplete transactions, so throw an error if we do
@@ -487,9 +488,9 @@ public class WALManager {
                     // Note that walReader has to be positioned at the start of the redo/undo data
                     // and this method will advance the reader's position past this redo/undo data.
                     byte[] changes = applyUndoAndGenRedoOnlyData(walReader, dbPage, numSegments);
-                    LogSequenceNumber lsn = writeRedoOnlyUpdatePageRecord(transactionID, currLSN, dbPage,
+                    prevLSN = recoveryInfo.getLastLSN(transactionID);
+                    LogSequenceNumber lsn = writeRedoOnlyUpdatePageRecord(transactionID, prevLSN, dbPage,
                             numSegments, changes);
-                    recoveryInfo.updateInfo(transactionID, lsn);
                     break;
                 case UPDATE_PAGE_REDO_ONLY:
                     break;
