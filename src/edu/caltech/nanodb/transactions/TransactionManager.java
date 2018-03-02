@@ -507,7 +507,7 @@ public class TransactionManager implements BufferManagerObserver {
             currDBFile = bufferManager.getFile(WALManager.getWALFileName(oldLsnFileNo));
             if (currDBFile != null) {
                 currPageSize = currDBFile.getPageSize();
-                bufferManager.writeDBFile(currDBFile, oldLsnFileNo/currPageSize,
+                bufferManager.writeDBFile(currDBFile, oldLsnFileOffset/currPageSize,
                         (lsnFileOffset + lsnRecordSize)/currPageSize, true);
             }
         }
