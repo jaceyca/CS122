@@ -461,7 +461,43 @@ public class WALManager {
             //                    type + " at LSN " + currLSN +
             //                    " during undo processing!");
             //            }
-
+            switch (type) {
+                case START_TXN:
+                    // We want to record that the transaction is aborted
+                    writeTxnRecord(WALRecordType.ABORT_TXN, transactionID, currLSN);
+                    recoveryInfo.recordTxnCompleted(transactionID);
+                    break;
+                // We shouldn't see commits or rollbacks for incomplete transactions, so throw an error if we do
+                case COMMIT_TXN:
+                case ABORT_TXN:
+                    throw new WALFileException(
+                            "Encountered incomplete WAL record type " + type + " at LSN " + currLSN +
+                                    " during undo processing!");
+                case UPDATE_PAGE:
+                    walReader.movePosition(6);
+                    // Get the file that was modified by this WAL record (1-256 bytes)
+                    String filename = walReader.readVarString255();
+                    // Get the page number that was modified (2 bytes)
+                    int dbPageNo = walReader.readUnsignedShort();
+                    // Load the page using the storage manager
+                    DBFile dbFile = storageManager.openDBFile(filename);
+                    DBPage dbPage = storageManager.loadDBPage(dbFile, dbPageNo);
+                    int numSegments = walReader.readUnsignedShort();
+                    // Undo the changes on the page and generate the redo-only data simultaneously.
+                    // Note that walReader has to be positioned at the start of the redo/undo data
+                    // and this method will advance the reader's position past this redo/undo data.
+                    byte[] changes = applyUndoAndGenRedoOnlyData(walReader, dbPage, numSegments);
+                    LogSequenceNumber lsn = writeRedoOnlyUpdatePageRecord(transactionID, currLSN, dbPage,
+                            numSegments, changes);
+                    recoveryInfo.updateInfo(transactionID, lsn);
+                    break;
+                case UPDATE_PAGE_REDO_ONLY:
+                    break;
+                default:
+                    throw new WALFileException(
+                        "Encountered unrecognized WAL record type " + type + " at LSN " + currLSN +
+                                " during undo processing!");
+            }
             oldLSN = currLSN;
         }
 
