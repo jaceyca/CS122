@@ -49,12 +49,14 @@ public class SimplePlanner extends AbstractPlannerImpl {
     public PlanNode makePlan(SelectClause selClause,
                              List<SelectClause> enclosingSelects) throws IOException {
 
+        PlanNode plan = null;
+
         if (enclosingSelects != null && !enclosingSelects.isEmpty()) {
-            throw new UnsupportedOperationException(
-                    "Not implemented:  enclosing queries");
+//            throw new UnsupportedOperationException(
+//                    "Not implemented:  enclosing queries");
+
         }
 
-        PlanNode plan = null;
         FromClause fromClause = selClause.getFromClause();
 
         // Here, we support the situations where there is no child plan,

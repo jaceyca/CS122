@@ -2,7 +2,6 @@ package edu.caltech.nanodb.expressions;
 
 import edu.caltech.nanodb.functions.AggregateFunction;
 import edu.caltech.nanodb.functions.Function;
-import edu.caltech.nanodb.plannodes.RenameNode;
 
 import java.util.*;
 
@@ -46,7 +45,6 @@ public class Aggregate implements ExpressionProcessor {
             // If i already see something that is in my set, I want to rename that node
             // to the corresponding A# value so it can evaluate that easily again.
             if (f instanceof AggregateFunction) {
-                // Make sure this is how to use ColumnValue!!!! who dat boy?? idk
                 String colNameString = "#A" + Integer.toString(numAggregates+1);
                 if (!rememberColNames.contains(colNameString)) {
                     rememberColNames.add(colNameString);
@@ -57,9 +55,7 @@ public class Aggregate implements ExpressionProcessor {
                     // If this is true, then we have seen the functionCall "call" before. In this case,
                     // we want to reuse the columnName we have stored for it using our amazing
                     // mapFuncitonToString map.
-                    System.out.println("colNameStr: " + colNameString);
                     String name = mapFunctionToString.get(call);
-                    System.out.println("name: " + name);
                     ColumnName colName = new ColumnName(name);
                     node = new ColumnValue(colName);
                 }
