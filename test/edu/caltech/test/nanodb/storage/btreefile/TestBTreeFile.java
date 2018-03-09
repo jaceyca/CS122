@@ -133,75 +133,75 @@ public class TestBTreeFile extends SqlTestCase {
         // server.getStorageManager().flushAllData();
     }
 
-
-    public void testBTreeTableOnePageInsert() throws Exception {
-        tryDoCommand("CREATE TABLE btree_one_page (a INTEGER, b VARCHAR(20)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_one_page", 300, 200, 3, 20, 0.0);
-    }
-
-
-    public void testBTreeTableTwoPageInsert() throws Exception {
-        tryDoCommand("CREATE TABLE btree_two_page (a INTEGER, b VARCHAR(50)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_two_page", 400, 200, 20, 50, 0.0);
-    }
-
-
-    public void testBTreeTableTwoLevelInsert() throws Exception {
-        tryDoCommand("CREATE TABLE btree_two_level (a INTEGER, b VARCHAR(50)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_two_level", 10000, 1000, 20, 50, 0.0);
-    }
-
-
-    public void testBTreeTableThreeLevelInsert() throws Exception {
-        tryDoCommand("CREATE TABLE btree_three_level (a INTEGER, b VARCHAR(250)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_three_level", 100000, 5000, 150, 250, 0.0);
-    }
-
-
-    public void testBTreeTableOnePageInsertDelete() throws Exception {
-        tryDoCommand("CREATE TABLE btree_one_page_del (a INTEGER, b VARCHAR(20)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_one_page_del", 400, 200, 3, 20, 0.05);
-    }
-
-
-    public void testBTreeTableTwoPageInsertDelete() throws Exception {
-        tryDoCommand("CREATE TABLE btree_two_page_del (a INTEGER, b VARCHAR(50)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_two_page_del", 500, 200, 20, 50, 0.05);
-    }
-
-
-    public void testBTreeTableTwoLevelInsertDelete() throws Exception {
-        tryDoCommand("CREATE TABLE btree_two_level_del (a INTEGER, b VARCHAR(50)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_two_level_del", 12000, 1000, 20, 50, 0.05);
-    }
-
-
-    public void testBTreeTableThreeLevelInsertDelete() throws Exception {
-        tryDoCommand("CREATE TABLE btree_three_level_del (a INTEGER, b VARCHAR(250)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_three_level_del", 120000, 5000, 150, 250, 0.05);
-    }
-
-
-    public void testBTreeTableMultiLevelInsertDelete() throws Exception {
-        tryDoCommand("CREATE TABLE btree_multi_level_del (a INTEGER, b VARCHAR(400)) " +
-            "PROPERTIES (storage = 'btree');", false);
-
-        runBTreeTest("btree_multi_level_del", 250000, 5000, 50, 400, 0.01);
-    }
+//
+//    public void testBTreeTableOnePageInsert() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_one_page (a INTEGER, b VARCHAR(20)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_one_page", 300, 200, 3, 20, 0.0);
+//    }
+//
+//
+//    public void testBTreeTableTwoPageInsert() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_two_page (a INTEGER, b VARCHAR(50)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_two_page", 400, 200, 20, 50, 0.0);
+//    }
+//
+//
+//    public void testBTreeTableTwoLevelInsert() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_two_level (a INTEGER, b VARCHAR(50)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_two_level", 10000, 1000, 20, 50, 0.0);
+//    }
+//
+//
+//    public void testBTreeTableThreeLevelInsert() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_three_level (a INTEGER, b VARCHAR(250)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_three_level", 100000, 5000, 150, 250, 0.0);
+//    }
+//
+//
+//    public void testBTreeTableOnePageInsertDelete() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_one_page_del (a INTEGER, b VARCHAR(20)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_one_page_del", 400, 200, 3, 20, 0.05);
+//    }
+//
+//
+//    public void testBTreeTableTwoPageInsertDelete() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_two_page_del (a INTEGER, b VARCHAR(50)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_two_page_del", 500, 200, 20, 50, 0.05);
+//    }
+//
+//
+//    public void testBTreeTableTwoLevelInsertDelete() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_two_level_del (a INTEGER, b VARCHAR(50)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_two_level_del", 12000, 1000, 20, 50, 0.05);
+//    }
+//
+//
+//    public void testBTreeTableThreeLevelInsertDelete() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_three_level_del (a INTEGER, b VARCHAR(250)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_three_level_del", 120000, 5000, 150, 250, 0.05);
+//    }
+//
+//
+//    public void testBTreeTableMultiLevelInsertDelete() throws Exception {
+//        tryDoCommand("CREATE TABLE btree_multi_level_del (a INTEGER, b VARCHAR(400)) " +
+//            "PROPERTIES (storage = 'btree');", false);
+//
+//        runBTreeTest("btree_multi_level_del", 250000, 5000, 50, 400, 0.01);
+//    }
 }
