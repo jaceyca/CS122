@@ -314,6 +314,7 @@ column_type returns [ColumnType ct]
   | TYPE_BIGINT { ct = new ColumnType(SQLDataType.BIGINT); }
   | TYPE_FLOAT { ct = new ColumnType(SQLDataType.FLOAT); }
   | TYPE_DOUBLE { ct = new ColumnType(SQLDataType.DOUBLE); }
+  | TYPE_NUMERIC { ct = new ColumnType(SQLDataType.NUMERIC); }
   | ( TYPE_CHAR { dt = SQLDataType.CHAR; } | TYPE_VARCHAR { dt = SQLDataType.VARCHAR; } )
     { ct = new ColumnType(dt); }
     LPAREN len:INT_LITERAL { ct.setLength(Integer.parseInt(len.getText())); }
@@ -1106,8 +1107,8 @@ literal_expr returns [Expression e]
   | FALSE               { e = new LiteralValue(Boolean.FALSE); }
   | ival:INT_LITERAL    { e = new LiteralValue(Integer.valueOf(ival.getText())); }
   | lval:LONG_LITERAL   { e = new LiteralValue(Long.valueOf(lval.getText())); }
-  | fval:FLOAT_LITERAL  { e = new LiteralValue(new Float(fval.getText())); }
-  | dval:DEC_LITERAL    { e = new LiteralValue(new Double(dval.getText())); }
+  | fval:FLOAT_LITERAL  { e = new LiteralValue(new BigDecimal(fval.getText())); }
+  | dval:DEC_LITERAL    { e = new LiteralValue(new BigDecimal(dval.getText())); }
   | sval:STRING_LITERAL { e = new LiteralValue(sval.getText()); }
   ;
 
