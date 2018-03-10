@@ -7,6 +7,8 @@ import edu.caltech.nanodb.relations.SQLDataType;
 import edu.caltech.nanodb.relations.Schema;
 import edu.caltech.nanodb.relations.SchemaNameException;
 
+import java.math.BigDecimal;
+
 
 /**
  * This class implements simple binary arithmetic operations.  The supported
@@ -155,7 +157,10 @@ public class ArithmeticOperator extends Expression {
 
         Object result;
 
-        if (coerced.value1 instanceof Double) {
+        if (coerced.value1 instanceof BigDecimal) {
+            result = evalBigDecimals(type, (BigDecimal) coerced.value1, (BigDecimal) coerced.value2);
+        }
+        else if (coerced.value1 instanceof Double) {
             result = evalDoubles(type, (Double) coerced.value1, (Double) coerced.value2);
         }
         else if (coerced.value1 instanceof Float) {
@@ -167,6 +172,59 @@ public class ArithmeticOperator extends Expression {
         else {
             assert coerced.value1 instanceof Integer;
             result = evalIntegers(type, (Integer) coerced.value1, (Integer) coerced.value2);
+        }
+
+        return result;
+    }
+
+
+    /**
+     * This helper implements the arithmetic operations for <tt>BigDecimal</tt>
+     * values.  Note that division of two <tt>BigDecimal</tt>s will produce a
+     * <tt>BigDecimal</tt>.
+     *
+     * @param type the arithmetic operation to perform
+     * @param aObj the first operand value for the operation
+     * @param bObj the second operand value for the operation
+     *
+     * @return the result of the arithmetic operation
+     *
+     * @throws ExpressionException if the operand type is unrecognized
+     */
+    private static BigDecimal evalBigDecimals(Type type, BigDecimal aObj, BigDecimal bObj) {
+        BigDecimal a = aObj;
+        BigDecimal b = bObj;
+        BigDecimal result;
+
+        switch (type) {
+            case ADD:
+                result = a.add(b);
+                break;
+
+            case SUBTRACT:
+                result = a.subtract(b);
+                break;
+
+            case MULTIPLY:
+                result = a.multiply(b);
+                break;
+
+            case DIVIDE:
+                // TODO:  How to handle divide-by-zero?
+                result = a.divide(b);
+                break;
+
+            case REMAINDER:
+                result = a.remainder(b);
+                break;
+
+            case POWER:
+                // TODO:  How to handle 0^0?
+                result = a.pow(b.intValue());
+                break;
+
+            default:
+                throw new ExpressionException("Unrecognized arithmetic type " + type);
         }
 
         return result;
