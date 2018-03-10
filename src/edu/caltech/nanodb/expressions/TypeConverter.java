@@ -1,6 +1,7 @@
 package edu.caltech.nanodb.expressions;
 
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 
 import edu.caltech.nanodb.relations.ColumnType;
@@ -40,6 +41,7 @@ public class TypeConverter {
 
         sqlTypeMapping.put(Float.class, SQLDataType.FLOAT);
         sqlTypeMapping.put(Double.class, SQLDataType.DOUBLE);
+        sqlTypeMapping.put(BigDecimal.class, SQLDataType.NUMERIC);
 
         sqlTypeMapping.put(String.class, SQLDataType.VARCHAR);
 
@@ -391,6 +393,44 @@ public class TypeConverter {
         else {
             throw new TypeCastException("Cannot convert type \"" +
                 obj.getClass() + "\" to double.");
+        }
+
+        return result;
+    }
+
+    /**
+     * This method attempts to convert the input value into a
+     * {@link java.math.BigDecimal} value.  If the input is a
+     * {@link java.lang.String} that can be parsed into a BigDecimal then the result
+     * is the parsed value.  If none of these cases hold then a
+     * {@link TypeCastException} is thrown.
+     *
+     * @param obj the input value to cast
+     *
+     * @return the input value cast to a <tt>BigDecimal</tt>
+     *
+     * @throws TypeCastException if the input value cannot be cast to a BigDecimal.
+     */
+    public static BigDecimal getBigDecimalValue(Object obj) {
+        if (obj == null)
+            return null;
+
+        BigDecimal result;
+
+        if (obj instanceof BigDecimal) {
+            result = (BigDecimal) obj;
+        }
+        else if (obj instanceof String) {
+            try {
+                result = new BigDecimal((String) obj);
+            }
+            catch (NumberFormatException nfe) {
+                throw new TypeCastException("Cannot convert string to BigDecimal.", nfe);
+            }
+        }
+        else {
+            throw new TypeCastException("Cannot convert type \"" +
+                    obj.getClass() + "\" to BigDecimal.");
         }
 
         return result;
