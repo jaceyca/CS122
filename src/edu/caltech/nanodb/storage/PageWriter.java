@@ -3,6 +3,8 @@ package edu.caltech.nanodb.storage;
 
 import edu.caltech.nanodb.relations.ColumnType;
 
+import java.util.Date;
+
 
 /**
  * This class extends the {@link PageReader} class to provide write operations
@@ -88,6 +90,7 @@ public class PageWriter extends PageReader
         position += len;
     }
 
+    public void writeDate(Date value) { writeLong(value.getTime()); }
 
     public void writeObject(ColumnType colType, Object value) {
         position += dbPage.writeObject(position, colType, value);

@@ -66,5 +66,7 @@ public class Interval implements Comparable<Interval> {
     public void setMillis(long millis) {
         milliseconds = millis;
     }
+
+    public long getMillis() { return milliseconds; }
 }
 

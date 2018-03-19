@@ -3,9 +3,11 @@ package edu.caltech.nanodb.expressions;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.Date;
 
 import edu.caltech.nanodb.relations.ColumnType;
 import edu.caltech.nanodb.relations.SQLDataType;
+import edu.caltech.nanodb.types.Interval;
 
 
 /**
@@ -44,6 +46,8 @@ public class TypeConverter {
         sqlTypeMapping.put(BigDecimal.class, SQLDataType.NUMERIC);
 
         sqlTypeMapping.put(String.class, SQLDataType.VARCHAR);
+        sqlTypeMapping.put(Date.class, SQLDataType.DATE);
+        sqlTypeMapping.put(Date.class, SQLDataType.DATETIME);
 
         // TODO:  others, in time...
     }
@@ -398,44 +402,6 @@ public class TypeConverter {
         return result;
     }
 
-    /**
-     * This method attempts to convert the input value into a
-     * {@link java.math.BigDecimal} value.  If the input is a
-     * {@link java.lang.String} that can be parsed into a BigDecimal then the result
-     * is the parsed value.  If none of these cases hold then a
-     * {@link TypeCastException} is thrown.
-     *
-     * @param obj the input value to cast
-     *
-     * @return the input value cast to a <tt>BigDecimal</tt>
-     *
-     * @throws TypeCastException if the input value cannot be cast to a BigDecimal.
-     */
-    public static BigDecimal getBigDecimalValue(Object obj) {
-        if (obj == null)
-            return null;
-
-        BigDecimal result;
-
-        if (obj instanceof BigDecimal) {
-            result = (BigDecimal) obj;
-        }
-        else if (obj instanceof String) {
-            try {
-                result = new BigDecimal((String) obj);
-            }
-            catch (NumberFormatException nfe) {
-                throw new TypeCastException("Cannot convert string to BigDecimal.", nfe);
-            }
-        }
-        else {
-            throw new TypeCastException("Cannot convert type \"" +
-                    obj.getClass() + "\" to BigDecimal.");
-        }
-
-        return result;
-    }
-
 
     /**
      * This method converts the input value into a {@link java.lang.String}
@@ -450,6 +416,54 @@ public class TypeConverter {
         return (obj != null ? obj.toString() : null);
     }
 
+
+    /**
+     * This method attempts to convert the input value into a
+     * {@link java.util.Date} value.  If the input is a long then the result
+     * is generated from the {@link java.util.Date#getTime} method,
+     *
+     * @param obj the input value to cast
+     * @param bool true if time should be included, false if rounded to date
+     *
+     * @return the input value cast to a <tt>Date</tt>
+     *
+     * @throws TypeCastException if the input value cannot be cast to a double.
+     */
+    public static Date getDateTimeValue(Object obj, Boolean bool) {
+        if (obj == null)
+            return null;
+
+        Date result;
+
+        if (obj instanceof Date) {
+            result = (Date) obj;
+        }
+        else if (obj instanceof Long) {
+            result = new Date((long) obj);
+        }
+        else if (obj instanceof Integer) {
+            throw new TypeCastException("Cannot convert type \"" +
+                    obj.getClass() + "\" to Date. Please append L to the end of the integer argument.");
+        }
+        else {
+            throw new TypeCastException("Cannot convert type \"" +
+                    obj.getClass() + "\" to Date.");
+        }
+
+        if (!bool) {
+            // there are 86,400,000 seconds in a day
+            // 1/1/1970 at 12 am is 28800000 seconds from the epoch
+            long milliseconds = result.getTime();
+            final long unixepoch = 28800000;
+            final long msInDay = 86400000;
+
+            long days = milliseconds - unixepoch;
+            long extraTime = days % msInDay;
+            milliseconds -= extraTime;
+            result = new Date(milliseconds);
+        }
+        return result;
+    }
 
     /**
      * This function takes two arguments and coerces them to be the same numeric
@@ -484,6 +498,25 @@ public class TypeConverter {
                     obj1 = getFloatValue(obj1);
                     obj2 = getFloatValue(obj2);
                 }
+                else if (obj1 instanceof Interval || obj2 instanceof Interval) {
+                    // At least one is an interval, so the other should be a date
+                    if (obj1 instanceof Date)
+                        obj1 = getDateTimeValue(obj1, true);
+                    else if (obj2 instanceof Date)
+                        obj2 = getDateTimeValue(obj2, true);
+                    else {
+                        // don't want to use anything that isn't 1 interval and 1 date
+                        throw new TypeCastException(String.format(
+                                "Cannot coerce types \"%s\" and \"%s\" for arithmetic.",
+                                obj1.getClass(), obj2.getClass()));
+                    }
+
+                }
+                else if (obj1 instanceof Date || obj2 instanceof Date) {
+                    // At least one is a Date, so convert both to Dates.
+                    obj1 = getDateTimeValue(obj1, true);
+                    obj2 = getDateTimeValue(obj2, true);
+                }
                 else if (obj1 instanceof Long || obj2 instanceof Long) {
                     // At least one is a Long, so convert both to Longs.
                     obj1 = getLongValue(obj1);
@@ -501,7 +534,17 @@ public class TypeConverter {
                     obj1.getClass(), obj2.getClass()));
             }
 
-            assert obj1.getClass().equals(obj2.getClass());
+            try {
+                assert obj1.getClass().equals(obj2.getClass());
+            } catch (AssertionError ae) {
+                Interval interval = new Interval();
+                if (obj1.getClass().equals(interval) || obj2.getClass().equals(interval)) {
+                    // this is fine
+                } else {
+                    throw ae;
+                }
+            }
+
         }
 
         return new Pair(obj1, obj2);

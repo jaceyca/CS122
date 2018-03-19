@@ -3,6 +3,8 @@ package edu.caltech.nanodb.storage;
 
 import edu.caltech.nanodb.relations.ColumnType;
 
+import java.util.Date;
+
 /**
  * This class facilitates sequences of read operations against a single
  * {@link DBPage} object, by providing "position" state that is also updated
@@ -248,6 +250,10 @@ public class PageReader {
     }
 
 
+    public Date readDate() {
+        return new Date(readLong());
+    }
+
     public Object readObject(ColumnType colType) {
         Object value = dbPage.readObject(position, colType);
 
@@ -256,35 +262,37 @@ public class PageReader {
         switch (colType.getBaseType()) {
 
         case INTEGER:
-        case FLOAT:
-            position += 4;
-            break;
+            case FLOAT:
+                position += 4;
+                break;
 
-        case SMALLINT:
-            position += 2;
-            break;
+            case SMALLINT:
+                position += 2;
+                break;
 
-        case BIGINT:
-        case DOUBLE:
-            position += 8;
-            break;
+            case BIGINT:
+            case DATE:
+            case DATETIME:
+            case DOUBLE:
+                position += 8;
+                break;
 
-        case TINYINT:
-            position += 1;
-            break;
+            case TINYINT:
+                position += 1;
+                break;
 
-        case CHAR:
-            position += colType.getLength();
-            break;
+            case CHAR:
+                position += colType.getLength();
+                break;
 
-        case VARCHAR:
-            // TODO:  Assume it's always stored as a 64KB varchar, not 256B.
-            position += 2 + ((String) value).length();
-            break;
+            case VARCHAR:
+                // TODO:  Assume it's always stored as a 64KB varchar, not 256B.
+                position += 2 + ((String) value).length();
+                break;
 
-        default:
-            throw new UnsupportedOperationException(
-                "Cannot currently store type " + colType.getBaseType());
+            default:
+                throw new UnsupportedOperationException(
+                        "Cannot currently store type " + colType.getBaseType());
         }
 
         return value;

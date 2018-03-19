@@ -6,8 +6,9 @@ import edu.caltech.nanodb.relations.ColumnType;
 import edu.caltech.nanodb.relations.SQLDataType;
 import edu.caltech.nanodb.relations.Schema;
 import edu.caltech.nanodb.relations.SchemaNameException;
+import edu.caltech.nanodb.types.Interval;
 
-import java.math.BigDecimal;
+import java.util.Date;
 
 
 /**
@@ -106,8 +107,8 @@ public class ArithmeticOperator extends Expression {
         // that type.  (This is not entirely accurate at the moment, but is
         // perfectly sufficient for our needs.)
         SQLDataType[] typeOrder = {
-            SQLDataType.NUMERIC, SQLDataType.DOUBLE, SQLDataType.FLOAT,
-            SQLDataType.BIGINT, SQLDataType.INTEGER, SQLDataType.SMALLINT,
+            SQLDataType.NUMERIC, SQLDataType.DOUBLE, SQLDataType.FLOAT, SQLDataType.DATETIME,
+            SQLDataType.DATE, SQLDataType.BIGINT, SQLDataType.INTEGER, SQLDataType.SMALLINT,
             SQLDataType.TINYINT
         };
 
@@ -168,6 +169,15 @@ public class ArithmeticOperator extends Expression {
         }
         else if (coerced.value1 instanceof Long) {
             result = evalLongs(type, (Long) coerced.value1, (Long) coerced.value2);
+        }
+        else if (coerced.value1 instanceof Interval) {
+            result = evalIntervalDate(type, (Interval) coerced.value1, (Date) coerced.value2);
+        }
+        else if (coerced.value2 instanceof Interval) {
+            result = evalDateInterval(type, (Date) coerced.value1, (Interval) coerced.value2);
+        }
+        else if (coerced.value1 instanceof Date) {
+            result = evalDates(type, (Date) coerced.value1, (Date) coerced.value2);
         }
         else {
             assert coerced.value1 instanceof Integer;
@@ -393,6 +403,96 @@ public class ArithmeticOperator extends Expression {
         return Long.valueOf(result);
     }
 
+    /**
+     * This helper implements the arithmetic operations for <tt>Date</tt>
+     * values.
+     *
+     * @param type the arithmetic operation to perform
+     * @param aObj the first operand value for the operation
+     * @param bObj the second operand value for the operation
+     *
+     * @return the result of the arithmetic operation
+     *
+     * @throws ExpressionException if the operand type is unrecognized
+     */
+    private static Object evalDates(Type type, Date aObj, Date bObj) {
+        long a = aObj.getTime();
+        long b = bObj.getTime();
+        long result;
+
+        switch (type) {
+            case ADD:
+                result = a + b;
+                break;
+
+            case SUBTRACT:
+                result = a - b;
+                break;
+
+            case DIVIDE:
+            case MULTIPLY:
+            case POWER:
+            case REMAINDER:
+                throw new ExpressionException("Doesn't make sense to evaluate 2 dates using " + type);
+
+            default:
+                throw new ExpressionException("Unrecognized arithmetic type " + type);
+        }
+
+        return new Date(result);
+    }
+
+    /**
+     * This helper implements the arithmetic operations for <tt>Date</tt>
+     * and <tt>Interval</tt> values.
+     *
+     * @param type the arithmetic operation to perform
+     * @param aObj the first operand value for the operation
+     * @param bObj the second operand value for the operation
+     *
+     * @return the result of the arithmetic operation
+     *
+     * @throws ExpressionException if the operand type is unrecognized
+     */
+    private static Object evalIntervalDate(Type type, Interval aObj, Date bObj) {
+        long a = aObj.getMillis();
+        long b = bObj.getTime();
+
+        if (type == Type.DIVIDE) {
+            // TODO:  How to handle divide-by-zero?
+            double result = (double) a / (double) b;
+            return new Double(result);
+        }
+
+        long result;
+
+        switch (type) {
+            case ADD:
+                result = a + b;
+                break;
+
+            case SUBTRACT:
+                result = a - b;
+                break;
+
+            case REMAINDER:
+                result = b % a;
+                break;
+
+            case MULTIPLY:
+            case POWER:
+                throw new ExpressionException("Doesn't make sense to evaluate a date and interval using " + type);
+
+            default:
+                throw new ExpressionException("Unrecognized arithmetic type " + type);
+        }
+
+        return Long.valueOf(result);
+    }
+
+    private static Object evalDateInterval(Type type, Date aObj, Interval bObj) {
+        return evalIntervalDate(type, bObj, aObj);
+    }
 
     /**
      * This helper implements the arithmetic operations for <tt>Integer</tt>

@@ -401,46 +401,51 @@ public abstract class PageTuple implements Tuple {
             ColumnType colType = schema.getColumnInfo(colIndex).getType();
             switch (colType.getBaseType()) {
 
-            case INTEGER:
-                value = Integer.valueOf(dbPage.readInt(offset));
-                break;
+                case INTEGER:
+                    value = Integer.valueOf(dbPage.readInt(offset));
+                    break;
 
-            case SMALLINT:
-                value = Short.valueOf(dbPage.readShort(offset));
-                break;
+                case SMALLINT:
+                    value = Short.valueOf(dbPage.readShort(offset));
+                    break;
 
-            case BIGINT:
-                value = Long.valueOf(dbPage.readLong(offset));
-                break;
+                case BIGINT:
+                    value = Long.valueOf(dbPage.readLong(offset));
+                    break;
 
-            case TINYINT:
-                value = Byte.valueOf(dbPage.readByte(offset));
-                break;
+                case TINYINT:
+                    value = Byte.valueOf(dbPage.readByte(offset));
+                    break;
 
-            case FLOAT:
-                value = Float.valueOf(dbPage.readFloat(offset));
-                break;
+                case FLOAT:
+                    value = Float.valueOf(dbPage.readFloat(offset));
+                    break;
 
-            case DOUBLE:
-                value = Double.valueOf(dbPage.readDouble(offset));
-                break;
+                case DOUBLE:
+                    value = Double.valueOf(dbPage.readDouble(offset));
+                    break;
 
-            case CHAR:
-                value = dbPage.readFixedSizeString(offset, colType.getLength());
-                break;
+                case CHAR:
+                    value = dbPage.readFixedSizeString(offset, colType.getLength());
+                    break;
 
-            case VARCHAR:
-                value = dbPage.readVarString65535(offset);
-                break;
+                case VARCHAR:
+                    value = dbPage.readVarString65535(offset);
+                    break;
 
-            case FILE_POINTER:
-                value = new FilePointer(dbPage.readUnsignedShort(offset),
-                                        dbPage.readUnsignedShort(offset + 2));
-                break;
+                case FILE_POINTER:
+                    value = new FilePointer(dbPage.readUnsignedShort(offset),
+                            dbPage.readUnsignedShort(offset + 2));
+                    break;
 
-            default:
-                throw new UnsupportedOperationException(
-                    "Cannot currently store type " + colType.getBaseType());
+                case DATE:
+                case DATETIME:
+                    value = dbPage.readDate(offset);
+                    break;
+
+                default:
+                    throw new UnsupportedOperationException(
+                            "Cannot currently store type " + colType.getBaseType());
             }
         }
 
@@ -737,45 +742,47 @@ public abstract class PageTuple implements Tuple {
 
         switch (colType.getBaseType()) {
 
-        case INTEGER:
-        case FLOAT:
-            size = 4;
-            break;
+            case INTEGER:
+            case FLOAT:
+                size = 4;
+                break;
 
-        case SMALLINT:
-            size = 2;
-            break;
+            case SMALLINT:
+                size = 2;
+                break;
 
-        case BIGINT:
-        case DOUBLE:
-            size = 8;
-            break;
+            case BIGINT:
+            case DATE:
+            case DATETIME:
+            case DOUBLE:
+                size = 8;
+                break;
 
-        case TINYINT:
-            size = 1;
-            break;
+            case TINYINT:
+                size = 1;
+                break;
 
-        case CHAR:
-            // CHAR values are of a fixed size, but the size is specified in
-            // the length field and there is no other storage required.
-            size = colType.getLength();
-            break;
+            case CHAR:
+                // CHAR values are of a fixed size, but the size is specified in
+                // the length field and there is no other storage required.
+                size = colType.getLength();
+                break;
 
-        case VARCHAR:
-            // VARCHAR values are of a variable size, but there is always a
-            // two byte length specified at the start of the value.
-            size = 2 + dataLength;
-            break;
+            case VARCHAR:
+                // VARCHAR values are of a variable size, but there is always a
+                // two byte length specified at the start of the value.
+                size = 2 + dataLength;
+                break;
 
-        case FILE_POINTER:
-            // File-pointers are comprised of a two-byte page number and a
-            // two-byte offset in the page.
-            size = 4;
-            break;
+            case FILE_POINTER:
+                // File-pointers are comprised of a two-byte page number and a
+                // two-byte offset in the page.
+                size = 4;
+                break;
 
-        default:
-            throw new UnsupportedOperationException(
-                "Cannot currently store type " + colType.getBaseType());
+            default:
+                throw new UnsupportedOperationException(
+                        "Cannot currently store type " + colType.getBaseType());
         }
 
         return size;

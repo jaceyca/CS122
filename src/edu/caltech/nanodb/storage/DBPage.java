@@ -4,6 +4,7 @@ package edu.caltech.nanodb.storage;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
+import java.util.Date;
 
 import org.apache.log4j.Logger;
 
@@ -980,6 +981,13 @@ public class DBPage implements Pinnable, AutoCloseable {
         Arrays.fill(pageData, position + bytes.length, position + len, (byte) 0);
     }
 
+    public Date readDate(int position) {
+        long milliseconds = readLong(position);
+        return new Date(milliseconds);
+    }
+
+    public void writeDate(int position, Date value) { writeLong(position, value.getTime()); }
+
 
     /**
      * This method provides a higher-level wrapper around the other methods in
@@ -1003,46 +1011,51 @@ public class DBPage implements Pinnable, AutoCloseable {
 
         switch (colType.getBaseType()) {
 
-        case INTEGER:
-            value = Integer.valueOf(readInt(position));
-            break;
+            case INTEGER:
+                value = Integer.valueOf(readInt(position));
+                break;
 
-        case SMALLINT:
-            value = Short.valueOf(readShort(position));
-            break;
+            case SMALLINT:
+                value = Short.valueOf(readShort(position));
+                break;
 
-        case BIGINT:
-            value = Long.valueOf(readLong(position));
-            break;
+            case BIGINT:
+                value = Long.valueOf(readLong(position));
+                break;
 
-        case TINYINT:
-            value = Byte.valueOf(readByte(position));
-            break;
+            case TINYINT:
+                value = Byte.valueOf(readByte(position));
+                break;
 
-        case FLOAT:
-            value = Float.valueOf(readFloat(position));
-            break;
+            case FLOAT:
+                value = Float.valueOf(readFloat(position));
+                break;
 
-        case DOUBLE:
-            value = Double.valueOf(readDouble(position));
-            break;
+            case DOUBLE:
+                value = Double.valueOf(readDouble(position));
+                break;
 
-        case CHAR:
-            value = readFixedSizeString(position, colType.getLength());
-            break;
+            case CHAR:
+                value = readFixedSizeString(position, colType.getLength());
+                break;
 
-        case VARCHAR:
-            value = readVarString65535(position);
-            break;
+            case VARCHAR:
+                value = readVarString65535(position);
+                break;
 
-        case FILE_POINTER:
-            value = new FilePointer(readUnsignedShort(position),
-                                    readUnsignedShort(position + 2));
-            break;
+            case FILE_POINTER:
+                value = new FilePointer(readUnsignedShort(position),
+                        readUnsignedShort(position + 2));
+                break;
 
-        default:
-            throw new UnsupportedOperationException(
-                "Cannot currently read type " + colType.getBaseType());
+            case DATE:
+            case DATETIME:
+                value = readDate(position);
+                break;
+
+            default:
+                throw new UnsupportedOperationException(
+                        "Cannot currently read type " + colType.getBaseType());
         }
 
         return value;
@@ -1083,72 +1096,63 @@ public class DBPage implements Pinnable, AutoCloseable {
         // This code relies on Java autoboxing.  Go, syntactic sugar.
         switch (colType.getBaseType()) {
 
-        case INTEGER:
-            {
+            case INTEGER: {
                 int iVal = TypeConverter.getIntegerValue(value);
                 writeInt(position, iVal);
                 dataSize = 4;
                 break;
             }
 
-        case SMALLINT:
-            {
+            case SMALLINT: {
                 short sVal = TypeConverter.getShortValue(value);
                 writeShort(position, sVal);
                 dataSize = 2;
                 break;
             }
 
-        case BIGINT:
-            {
+            case BIGINT: {
                 long lVal = TypeConverter.getLongValue(value);
                 writeLong(position, lVal);
                 dataSize = 8;
                 break;
             }
 
-        case TINYINT:
-            {
+            case TINYINT: {
                 byte bVal = TypeConverter.getByteValue(value);
                 writeByte(position, bVal);
                 dataSize = 1;
                 break;
             }
 
-        case FLOAT:
-            {
+            case FLOAT: {
                 float fVal = TypeConverter.getFloatValue(value);
                 writeFloat(position, fVal);
                 dataSize = 4;
                 break;
             }
 
-        case DOUBLE:
-            {
+            case DOUBLE: {
                 double dVal = TypeConverter.getDoubleValue(value);
                 writeDouble(position, dVal);
                 dataSize = 8;
                 break;
             }
 
-        case CHAR:
-            {
+            case CHAR: {
                 String strVal = TypeConverter.getStringValue(value);
                 writeFixedSizeString(position, strVal, colType.getLength());
                 dataSize = colType.getLength();
                 break;
             }
 
-        case VARCHAR:
-            {
+            case VARCHAR: {
                 String strVal = TypeConverter.getStringValue(value);
                 writeVarString65535(position, strVal);
                 dataSize = 2 + strVal.length();
                 break;
             }
 
-        case FILE_POINTER:
-            {
+            case FILE_POINTER: {
                 FilePointer fptr = (FilePointer) value;
                 writeShort(position, fptr.getPageNo());
                 writeShort(position + 2, fptr.getOffset());
@@ -1156,9 +1160,23 @@ public class DBPage implements Pinnable, AutoCloseable {
                 break;
             }
 
-        default:
-            throw new UnsupportedOperationException(
-                "Cannot currently store type " + colType.getBaseType());
+            case DATE: {
+                Date dateVal = TypeConverter.getDateTimeValue(value, false);
+                writeDate(position, dateVal);
+                dataSize = 8;   // same as BIGINT, which is a long
+                break;
+            }
+
+            case DATETIME: {
+                Date dateVal = TypeConverter.getDateTimeValue(value, true);
+                writeDate(position, dateVal);
+                dataSize = 8;   // same as BIGINT, which is a long
+                break;
+            }
+
+            default:
+                throw new UnsupportedOperationException(
+                        "Cannot currently store type " + colType.getBaseType());
         }
 
         return dataSize;
